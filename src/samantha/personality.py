@@ -47,7 +47,8 @@ class SamanthaPersonality:
         if not response:
             return self._fallback_response(user_input)
 
-        # Don't modify if already warm/personal
+        # Don't modify LLM responses - they already have personality
+        return response
         if self._is_already_warm(response):
             return response
 

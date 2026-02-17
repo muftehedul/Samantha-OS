@@ -1,0 +1,10 @@
+Package: samantha-os
+Version: 1.0.0
+Section: utils
+Priority: optional
+Architecture: amd64
+Depends: python3, python3-pyqt5, python3-pip, espeak-ng, pulseaudio-utils, alsa-utils
+Maintainer: Samantha OS <samantha@example.com>
+Description: Samantha OS - AI Assistant inspired by "Her" (2013)
+ A warm, emotionally intelligent AI companion with minimalist interface.
+ Features offline voice recognition, natural TTS, and free LLM integration.

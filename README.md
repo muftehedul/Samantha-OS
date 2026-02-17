@@ -31,7 +31,10 @@ The interface features:
 # Download and install
 wget https://github.com/muftehedul/Samantha-OS/releases/download/v1.0.0/samantha-os_1.0.0_amd64.deb
 sudo dpkg -i samantha-os_1.0.0_amd64.deb
-sudo apt-get install -f  # Install dependencies
+
+# Install dependencies
+sudo apt-get install -f
+sudo apt install python3-pyaudio portaudio19-dev espeak-ng alsa-utils pulseaudio-utils
 
 # Run
 samantha
@@ -44,11 +47,11 @@ samantha
 git clone https://github.com/muftehedul/Samantha-OS.git
 cd Samantha-OS
 
-# Install dependencies
-pip install PyQt5 vosk sounddevice numpy pyttsx3
+# Install Python dependencies
+pip install PyQt5 vosk sounddevice pyttsx3
 
 # Install system dependencies
-sudo apt install espeak-ng pulseaudio-utils alsa-utils
+sudo apt install python3-pyaudio portaudio19-dev espeak-ng alsa-utils pulseaudio-utils
 
 # Run
 cd src
@@ -58,6 +61,18 @@ PYTHONPATH=. python3 samantha_app.py
 ### Build DEB Package
 
 ```bash
+# Prepare structure
+mkdir -p debian/DEBIAN debian/opt/samantha debian/usr/bin debian/usr/share/applications
+
+# Copy files
+cp -r src/samantha debian/opt/samantha/
+cp src/samantha_app.py debian/opt/samantha/
+cp -r models/vosk-model-small-en-us-0.15/* debian/opt/samantha/models/
+
+# Create control file (see debian/DEBIAN/control)
+# Create launcher script (see debian/usr/bin/samantha)
+# Create desktop entry (see debian/usr/share/applications/samantha.desktop)
+
 # Build
 dpkg-deb --build debian/ samantha-os_1.0.0_amd64.deb
 
@@ -161,7 +176,27 @@ Config file: `~/.config/samantha/config.json`
 - vosk
 - sounddevice
 - pyttsx3
+- python3-pyaudio
+- portaudio19-dev
 - espeak-ng
+
+## Technical Details
+
+### Voice System
+- **STT**: Vosk (offline, small English model)
+- **TTS**: espeak-ng with female voice (en-us+f3, pitch 65, speed 160)
+- **Real-time transcription**: Live display as you speak
+
+### LLM Integration
+- **Model**: kilo/openrouter/free (via Kilo CLI)
+- **Personality**: Samantha from "Her" (2013)
+- **Identity**: Warm, emotionally intelligent female AI
+
+### UI Features
+- Circular gradient voice button (Her movie style)
+- Real-time transcription display
+- Enhanced listening animation (8x speed, dramatic breathing effect)
+- Warm color palette (coral #FF6B6B, peach #FFB4A2, seashell #FFF5EE)
 
 ## Cost
 

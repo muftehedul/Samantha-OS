@@ -71,31 +71,92 @@ def gui_mode(config_path: str):
             if text:
                 window.add_message(text, is_user=True)
                 window.input_field.clear()
-                threading.Thread(
-                    target=samantha.process_text_input, args=(text,), daemon=True
-                ).start()
+                
+                def process_in_thread():
+                    try:
+                        response = samantha.process_text_input(text)
+                        print(f"[DEBUG] Got response: {response[:100]}...")
+                    except Exception as e:
+                        print(f"[ERROR] Processing failed: {e}")
+                        import traceback
+                        traceback.print_exc()
+                
+                threading.Thread(target=process_in_thread, daemon=True).start()
 
         def toggle_voice(checked):
             if checked:
                 window.set_state("listening", "Listening...")
-                window.voice_btn.setText("🎤 Listening...")
+                window.voice_label.setText("Listening...")
+                window.transcription_label.setText("")
+                window.transcription_label.show()
 
-                # Start voice recording
+                # Start voice recording with real-time transcription
                 def listen_and_process():
-                    audio = samantha.voice_engine.listen(duration=5)
-                    if audio:
-                        text = samantha.voice_engine.transcribe(audio)
-                        if text:
-                            window.add_message(text, is_user=True)
-                            samantha.process_text_input(text)
+                    import json
+                    from vosk import KaldiRecognizer
+                    
+                    recognizer = KaldiRecognizer(samantha.voice_engine.vosk_model, 16000)
+                    recognizer.SetWords(True)
+                    
+                    try:
+                        import sounddevice as sd
+                        import queue
+                        
+                        q = queue.Queue()
+                        
+                        def audio_callback(indata, frames, time, status):
+                            q.put(bytes(indata))
+                        
+                        with sd.RawInputStream(samplerate=16000, blocksize=8000, dtype='int16',
+                                             channels=1, callback=audio_callback):
+                            
+                            full_text = ""
+                            import time
+                            start_time = time.time()
+                            
+                            while window.voice_btn.isChecked() and (time.time() - start_time) < 10:
+                                try:
+                                    data = q.get(timeout=0.1)
+                                    if recognizer.AcceptWaveform(data):
+                                        result = json.loads(recognizer.Result())
+                                        if result.get("text"):
+                                            full_text = result["text"]
+                                            window.transcription_label.setText(full_text)
+                                    else:
+                                        partial = json.loads(recognizer.PartialResult())
+                                        if partial.get("partial"):
+                                            display_text = full_text + " " + partial["partial"] if full_text else partial["partial"]
+                                            window.transcription_label.setText(display_text)
+                                except queue.Empty:
+                                    continue
+                            
+                            # Final result
+                            final_result = json.loads(recognizer.FinalResult())
+                            if final_result.get("text"):
+                                full_text = final_result["text"]
+                        
+                        if full_text:
+                            window.transcription_label.setText(f'"{full_text}"')
+                            window.add_message(full_text, is_user=True)
+                            samantha.process_text_input(full_text)
+                        else:
+                            window.transcription_label.setText("No speech detected")
+                            
+                    except Exception as e:
+                        window.transcription_label.setText(f"Error: {str(e)}")
+                    
+                    from PyQt5.QtCore import QTimer
+                    QTimer.singleShot(2000, window.transcription_label.hide)
                     window.voice_btn.setChecked(False)
-                    window.voice_btn.setText("🎤  Hold to speak")
+                    window.voice_label.setText("Hold to speak")
                     window.set_state("idle", "Online")
 
                 threading.Thread(target=listen_and_process, daemon=True).start()
 
         window.send_btn.clicked.connect(send_message)
         window.voice_btn.clicked.connect(toggle_voice)
+        
+        window.show()
 
         return app.exec_()
 

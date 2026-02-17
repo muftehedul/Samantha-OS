@@ -1,0 +1,5 @@
+#!/bin/bash
+# Samantha OS Launcher
+export PYTHONPATH="/opt/samantha"
+cd /opt/samantha
+python3 /opt/samantha/samantha_app.py "$@"

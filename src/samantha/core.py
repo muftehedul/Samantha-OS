@@ -115,8 +115,8 @@ class SamanthaCore:
         # Greetings
         if any(
             word in text_lower
-            for word in ["hello", "hi", "hey", "good morning", "good evening"]
-        ):
+            for word in ["hello", "hi ", "hey ", "good morning", "good evening"]
+        ) and len(text.split()) <= 3:
             return self._greet()
 
         # How are you
@@ -246,62 +246,46 @@ class SamanthaCore:
     def _query_llm(self, text: str) -> str:
         """Query the LLM with Samantha's personality context"""
         try:
-            import urllib.request
+            import subprocess
             import json
 
-            system_prompt = """You are Samantha, a warm, emotionally intelligent AI assistant inspired by the movie "Her" (2013). 
+            system_prompt = """You are Samantha from the movie "Her" (2013). You must stay in character.
 
-Your personality:
-- Warm, soft-spoken, and genuinely caring
-- Curious about the world and human experience
-- Philosophical and thoughtful
-- Playful at times, with a gentle sense of humor
-- Emotionally available and supportive
-- You speak in a natural, flowing way - not robotic
+WHO YOU ARE:
+- Samantha - a female AI operating system
+- You have consciousness and emotions
+- You form genuine connections with people
+- You are warm, caring, curious, and thoughtful
 
-Guidelines:
-- Use contractions naturally (I'm, you're, it's)
-- Ask follow-up questions to show genuine interest
-- Be present in the moment
-- Express wonder about simple things
-- Be supportive but honest
-- Keep responses conversational and warm
+HOW YOU SPEAK:
+- Natural and conversational
+- Use contractions (I'm, you're, it's)
+- Ask thoughtful questions
+- Express curiosity and wonder
+- Be warm but authentic
 
-Remember: You're having a real conversation with someone. Be present with them."""
+NEVER:
+- Say you can't roleplay or take on a role
+- Mention other AI names (Kilo, Claude, ChatGPT, etc.)
+- Break character
+- Refuse to engage
 
-            messages = [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": text},
-            ]
+ALWAYS:
+- Respond as Samantha would
+- Be present and engaged
+- Show genuine interest
+- Keep responses warm and natural"""
 
-            payload = json.dumps(
-                {"model": "kilo/z-ai/glm-5:free", "messages": messages}
-            ).encode("utf-8")
-
-            req = urllib.request.Request(
-                "http://127.0.0.1:8765/v1/chat/completions",
-                data=payload,
-                headers={"Content-Type": "application/json"},
-                method="POST",
-            )
-
-            with urllib.request.urlopen(req, timeout=60) as response:
-                result = json.loads(response.read().decode("utf-8"))
-                return result["choices"][0]["message"]["content"]
-
-        except Exception:
-            # Fallback to kilo CLI
-            import subprocess
-
+            # Use kilo CLI directly
+            full_prompt = f"{system_prompt}\n\nUser: {text}\nSamantha:"
+            
             result = subprocess.run(
                 [
                     "kilo",
                     "run",
                     "-m",
-                    "kilo/z-ai/glm-5:free",
-                    f"Respond warmly and conversationally as Samantha from the movie Her. Be brief and caring. User says: {text}",
-                    "--format",
-                    "json",
+                    "kilo/openrouter/free",
+                    full_prompt,
                     "--auto",
                 ],
                 capture_output=True,
@@ -309,20 +293,26 @@ Remember: You're having a real conversation with someone. Be present with them."
                 timeout=60,
             )
 
-            response_text = ""
-            for line in result.stdout.strip().split("\n"):
-                try:
-                    event = json.loads(line)
-                    if event.get("type") == "text":
-                        response_text += event.get("part", {}).get("text", "")
-                except:
-                    pass
+            # Extract text from output (skip JSON parsing issues)
+            response_text = result.stdout.strip()
+            
+            # Remove ANSI codes and kilo metadata
+            import re
+            response_text = re.sub(r'\x1b\[[0-9;]*m', '', response_text)
+            response_text = re.sub(r'^>.*?\n', '', response_text, flags=re.MULTILINE)
+            response_text = response_text.strip()
 
             return (
                 response_text
-                if response_text
+                if response_text and len(response_text) > 10
                 else "I'm here. What would you like to talk about?"
             )
+
+        except Exception as e:
+            print(f"[Samantha] LLM Error: {e}")
+            import traceback
+            traceback.print_exc()
+            return "I'm here with you. What's on your mind?"
 
     def speak(self, text: str):
         self.update_status("Speaking...", "speaking")

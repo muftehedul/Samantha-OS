@@ -29,6 +29,7 @@ class VoiceEngine:
                 from vosk import Model, KaldiRecognizer
 
                 model_paths = [
+                    "/opt/samantha/models",
                     "/opt/samantha/models/vosk-model-small-en-us-0.15",
                     os.path.expanduser(
                         "~/.samantha/models/vosk-model-small-en-us-0.15"
@@ -95,50 +96,45 @@ class VoiceEngine:
         return ""
 
     def speak(self, text: str):
-        """Speak with Samantha's soft, warm voice"""
+        """Speak with Samantha's soft, warm female voice"""
         if not text or not text.strip():
             return
 
         text = text.strip()
 
-        # Try pyttsx3 first (better female voice)
-        if self._speak_pyttsx3_female(text):
-            return
-
-        # Fallback to espeak with soft settings
+        # Force espeak female voice (pyttsx3 uses male by default)
         self._speak_espeak_soft(text)
 
     def _speak_pyttsx3_female(self, text: str) -> bool:
-        """Speak with pyttsx3 female voice"""
+        """Speak with pyttsx3 female voice - warm and soft like Her movie"""
         try:
             import pyttsx3
 
             engine = pyttsx3.init()
 
-            # Slower, softer rate
-            engine.setProperty("rate", 140)
-            engine.setProperty("volume", 0.85)
+            # Warm, conversational rate (like Samantha in Her)
+            engine.setProperty("rate", 155)  # Slightly faster, more natural
+            engine.setProperty("volume", 0.9)
 
-            # Find female voice
+            # Find best female voice
             voices = engine.getProperty("voices")
+            female_voice = None
+            
             for voice in voices:
                 voice_name = voice.name.lower()
                 voice_id = voice.id.lower()
 
-                # Look for female English voices
-                if (
-                    "female" in voice_name
-                    or "woman" in voice_name
-                    or "zira" in voice_id
-                    or "samantha" in voice_name
-                    or "karen" in voice_name
-                    or "victoria" in voice_name
-                ):
-                    engine.setProperty("voice", voice.id)
+                # Prioritize specific warm female voices
+                if any(name in voice_name for name in ["samantha", "karen", "victoria", "fiona"]):
+                    female_voice = voice.id
                     break
-                elif "english" in voice_name and "female" not in voice_name:
-                    # Use any English voice as fallback
-                    engine.setProperty("voice", voice.id)
+                elif "female" in voice_name or "woman" in voice_name:
+                    female_voice = voice.id
+                elif not female_voice and ("english" in voice_name or "en" in voice_id):
+                    female_voice = voice.id
+
+            if female_voice:
+                engine.setProperty("voice", female_voice)
 
             engine.say(text)
             engine.runAndWait()
@@ -149,22 +145,20 @@ class VoiceEngine:
             return False
 
     def _speak_espeak_soft(self, text: str):
-        """Soft, warm espeak voice"""
+        """Soft, warm female espeak voice"""
         try:
-            # Use Storm variant with slower, softer settings
+            # Use female variant with warm settings
             subprocess.run(
                 [
                     "espeak-ng",
                     "-v",
-                    "!v/Storm",  # Storm voice (warmer)
+                    "en-us+f3",  # Female voice variant
                     "-s",
-                    "130",  # Slower = softer feel
+                    "160",  # Natural conversational speed
                     "-p",
-                    "55",  # Slightly higher pitch
+                    "65",  # Higher pitch for female
                     "-a",
-                    "120",  # Softer volume
-                    "-k",
-                    "10",  # Gentle emphasis
+                    "150",  # Clear volume
                     text,
                 ],
                 stdout=subprocess.DEVNULL,
@@ -172,7 +166,6 @@ class VoiceEngine:
                 timeout=30,
             )
         except Exception:
-            # Absolute fallback
             print(f"[Samantha] {text}")
 
     def listen(self, duration: float = 5.0) -> Optional[bytes]:

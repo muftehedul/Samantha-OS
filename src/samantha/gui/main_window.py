@@ -72,12 +72,14 @@ class PulseWidget(QWidget):
         self.update()
 
     def animate(self):
-        self._pulse = (self._pulse + 2) % 360
-
         if self.state == "listening":
-            self._opacity += 0.02 * self.pulse_direction
-            if self._opacity >= 1.0 or self._opacity <= 0.4:
+            self._pulse = (self._pulse + 8) % 360  # Very fast for listening
+            self._opacity += 0.08 * self.pulse_direction  # Dramatic breathing effect
+            if self._opacity >= 1.0 or self._opacity <= 0.2:
                 self.pulse_direction *= -1
+        else:
+            self._pulse = (self._pulse + 2) % 360
+            self._opacity = 0.8
 
         self.update()
 
@@ -94,7 +96,7 @@ class PulseWidget(QWidget):
         # Outer glow
         for i in range(3):
             glow_color = QColor(color)
-            glow_color.setAlpha(int(30 - i * 10) * self._opacity)
+            glow_color.setAlpha(int((30 - i * 10) * self._opacity))
             painter.setPen(Qt.NoPen)
             painter.setBrush(QBrush(glow_color))
             radius = (
@@ -307,31 +309,72 @@ class SamanthaWindow(QMainWindow):
 
         main_layout.addWidget(input_frame)
 
-        # Voice button
-        voice_layout = QHBoxLayout()
-        voice_layout.addStretch()
+        # Voice button - Her movie inspired
+        voice_container = QWidget()
+        voice_container_layout = QVBoxLayout(voice_container)
+        voice_container_layout.setSpacing(10)
+        
+        button_layout = QHBoxLayout()
+        button_layout.addStretch()
 
-        self.voice_btn = QPushButton("🎤  Hold to speak")
+        self.voice_btn = QPushButton("")
         self.voice_btn.setCheckable(True)
+        self.voice_btn.setFixedSize(60, 60)
         self.voice_btn.setStyleSheet(f"""
             QPushButton {{
-                background-color: transparent;
-                color: {COLORS["text_light"]};
-                border: 1px solid {COLORS["accent"]};
-                border-radius: 20px;
-                padding: 10px 25px;
-                font-size: 12px;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 {COLORS["accent"]}, stop:1 {COLORS["primary"]});
+                border: none;
+                border-radius: 30px;
+                color: white;
+                font-size: 24px;
+            }}
+            QPushButton:hover {{
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 {COLORS["primary"]}, stop:1 #FF5555);
             }}
             QPushButton:checked {{
-                background-color: {COLORS["primary"]};
-                color: white;
-                border-color: {COLORS["primary"]};
+                background: {COLORS["primary"]};
+                border: 3px solid white;
+                box-shadow: 0 0 20px {COLORS["primary"]};
             }}
         """)
-        voice_layout.addWidget(self.voice_btn)
-        voice_layout.addStretch()
+        self.voice_btn.setText("🎤")
+        button_layout.addWidget(self.voice_btn)
+        button_layout.addStretch()
+        
+        voice_container_layout.addLayout(button_layout)
+        
+        # Button label
+        self.voice_label = QLabel("Hold to speak")
+        self.voice_label.setAlignment(Qt.AlignCenter)
+        self.voice_label.setStyleSheet(f"""
+            QLabel {{
+                color: {COLORS["text_light"]};
+                font-size: 11px;
+                font-weight: 300;
+            }}
+        """)
+        voice_container_layout.addWidget(self.voice_label)
 
-        main_layout.addLayout(voice_layout)
+        main_layout.addWidget(voice_container)
+        
+        # Live transcription - real-time display
+        self.transcription_label = QLabel("")
+        self.transcription_label.setAlignment(Qt.AlignCenter)
+        self.transcription_label.setStyleSheet(f"""
+            QLabel {{
+                color: {COLORS["primary"]};
+                font-size: 14px;
+                font-weight: 400;
+                padding: 10px;
+                background-color: {COLORS["secondary"]};
+                border-radius: 15px;
+            }}
+        """)
+        self.transcription_label.setWordWrap(True)
+        self.transcription_label.hide()
+        main_layout.addWidget(self.transcription_label)
 
         # Welcome message
         self.add_message("Hi, I'm Samantha. How are you feeling today?", is_user=False)
