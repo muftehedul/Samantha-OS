@@ -14,14 +14,57 @@ from typing import Optional
 class VoiceEngine:
     def __init__(self, config: dict):
         self.config = config
-        self.stt_provider = config.get("stt_provider", "vosk")
-        self.tts_provider = config.get("tts_provider", "espeak-natural")
+        self.stt_provider = config.get("stt_provider", "whisper")  # Default to whisper
+        self.tts_provider = config.get("tts_provider", "spd-say")
         self.sample_rate = 16000
         self.channels = 1
 
+        self.whisper_model = None
         self.vosk_model = None
         self.vosk_recognizer = None
-        self._init_vosk()
+        self._audio_device = None
+        self._detect_audio_device()
+        self._init_whisper()  # For accurate final transcription
+        self._init_vosk()     # For real-time partial display
+
+    def _detect_audio_device(self):
+        """Detect the best audio input device"""
+        try:
+            import sounddevice as sd
+            # Try to find a working device with input channels
+            devices = sd.query_devices()
+            # Prefer default device which handles channel conversion
+            default_dev = sd.query_devices(kind='input')
+            if default_dev and default_dev['max_input_channels'] > 0:
+                print(f"[Samantha] Using default audio device: {default_dev['name']}")
+                self._audio_device = None  # Use default
+                return
+            # Fallback: find pulse or alsa_input
+            for i, dev in enumerate(devices):
+                if dev['max_input_channels'] > 0:
+                    if 'pulse' in dev['name'].lower() or 'alsa_input' in dev['name'].lower():
+                        self._audio_device = i
+                        print(f"[Samantha] Using audio device {i}: {dev['name']}")
+                        return
+            self._audio_device = None  # Use system default
+        except Exception as e:
+            print(f"[Samantha] Audio device detection: {e}")
+            self._audio_device = None
+
+    def _init_whisper(self):
+        """Initialize Whisper model for speech recognition"""
+        try:
+            from faster_whisper import WhisperModel
+            print("[Samantha] Loading Whisper model...")
+            # Use tiny model for fast real-time transcription
+            self.whisper_model = WhisperModel('tiny', device='cpu', compute_type='int8')
+            print("[Samantha] Voice ready (Whisper)")
+        except ImportError:
+            print("[Samantha] faster-whisper not found, falling back to Vosk")
+            self._init_vosk()
+        except Exception as e:
+            print(f"[Samantha] Whisper init error: {e}, falling back to Vosk")
+            self._init_vosk()
 
     def _init_vosk(self):
         if self.stt_provider == "vosk":
@@ -48,7 +91,7 @@ class VoiceEngine:
                     self.vosk_recognizer = KaldiRecognizer(
                         self.vosk_model, self.sample_rate
                     )
-                    print(f"[Samantha] Voice ready")
+                    print(f"[Samantha] Vosk ready (for real-time display)")
                 else:
                     self._download_vosk_model()
 
@@ -83,6 +126,17 @@ class VoiceEngine:
         except Exception as e:
             print(f"[Samantha] Voice model error: {e}")
 
+    def transcribe_audio_file(self, audio_path: str) -> str:
+        """Transcribe audio file using Whisper (more accurate)"""
+        if self.whisper_model:
+            try:
+                segments, info = self.whisper_model.transcribe(audio_path, language='en')
+                text = ''.join([segment.text for segment in segments])
+                return text.strip()
+            except Exception as e:
+                print(f"[Samantha] Whisper transcription error: {e}")
+        return ""
+
     def transcribe(self, audio_data: bytes) -> str:
         if self.stt_provider == "vosk" and self.vosk_recognizer:
             try:
@@ -96,14 +150,69 @@ class VoiceEngine:
         return ""
 
     def speak(self, text: str):
-        """Speak with Samantha's soft, warm female voice"""
+        """Speak with Samantha's soft, warm female voice using Edge TTS"""
         if not text or not text.strip():
             return
 
         text = text.strip()
+        print(f"[Samantha] Speaking: {text[:50]}...")
+        
+        # Only use Edge TTS (most natural voice)
+        self._speak_edge_tts(text)
 
-        # Force espeak female voice (pyttsx3 uses male by default)
-        self._speak_espeak_soft(text)
+    def _speak_spd_say(self, text: str):
+        """Speak using speech-dispatcher spd-say with female voice"""
+        try:
+            subprocess.run(
+                [
+                    "spd-say",
+                    "-t", "female1",      # Female voice type
+                    "-r", "-10",          # Slightly slower rate
+                    "-p", "30",           # Higher pitch for female
+                    "-w",                 # Wait until done
+                    text,
+                ],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=60,
+            )
+            print("[Samantha] Speech completed")
+        except Exception as e:
+            print(f"[Samantha] spd-say error: {e}")
+            # Fallback to pyttsx3
+            self._speak_pyttsx3_female(text)
+
+    def _speak_edge_tts(self, text: str):
+        """Speak using Edge TTS - natural sounding voice"""
+        import tempfile
+        import os
+        
+        temp_mp3 = tempfile.mktemp(suffix='.mp3')
+        
+        try:
+            # Generate speech with JennyNeural (friendly female voice)
+            subprocess.run(
+                ["edge-tts", "--voice", "en-US-JennyNeural", "--text", text, "--write-media", temp_mp3],
+                capture_output=True,
+                timeout=30
+            )
+            
+            # Play with pygame
+            import pygame
+            pygame.mixer.init()
+            pygame.mixer.music.load(temp_mp3)
+            pygame.mixer.music.play()
+            while pygame.mixer.music.get_busy():
+                pygame.time.Clock().tick(10)
+            pygame.mixer.quit()
+            
+            print("[Samantha] Speech completed")
+            
+        except Exception as e:
+            print(f"[Samantha] Edge TTS error: {e}")
+        finally:
+            if os.path.exists(temp_mp3):
+                os.unlink(temp_mp3)
 
     def _speak_pyttsx3_female(self, text: str) -> bool:
         """Speak with pyttsx3 female voice - warm and soft like Her movie"""
@@ -113,35 +222,54 @@ class VoiceEngine:
             engine = pyttsx3.init()
 
             # Warm, conversational rate (like Samantha in Her)
-            engine.setProperty("rate", 155)  # Slightly faster, more natural
-            engine.setProperty("volume", 0.9)
+            engine.setProperty("rate", 145)  # Natural speed
+            engine.setProperty("volume", 1.0)
 
             # Find best female voice
             voices = engine.getProperty("voices")
             female_voice = None
             
+            # Priority order for voice selection
             for voice in voices:
-                voice_name = voice.name.lower()
-                voice_id = voice.id.lower()
+                voice_name = voice.name.lower() if voice.name else ""
+                voice_id = voice.id.lower() if voice.id else ""
 
-                # Prioritize specific warm female voices
-                if any(name in voice_name for name in ["samantha", "karen", "victoria", "fiona"]):
+                # First choice: English America (most natural)
+                if "english (america)" in voice_name or voice_id == "gmw/en-us":
                     female_voice = voice.id
+                    print(f"[Samantha] Selected voice: {voice.name}")
                     break
-                elif "female" in voice_name or "woman" in voice_name:
-                    female_voice = voice.id
-                elif not female_voice and ("english" in voice_name or "en" in voice_id):
-                    female_voice = voice.id
+                    
+                # Second choice: Great Britain English
+                if "english (great britain)" in voice_name or voice_id == "gmw/en":
+                    if female_voice is None:
+                        female_voice = voice.id
+                        print(f"[Samantha] Selected voice: {voice.name}")
+
+            if female_voice is None:
+                # Fallback: find any English voice
+                for voice in voices:
+                    voice_name = voice.name.lower() if voice.name else ""
+                    voice_id = voice.id.lower() if voice.id else ""
+                    if "english" in voice_name:
+                        female_voice = voice.id
+                        print(f"[Samantha] Fallback voice: {voice.name}")
+                        break
 
             if female_voice:
                 engine.setProperty("voice", female_voice)
+            else:
+                print("[Samantha] No English voice found, using default")
 
             engine.say(text)
             engine.runAndWait()
+            print("[Samantha] Speech completed")
             return True
 
         except Exception as e:
             print(f"[Samantha] Voice error: {e}")
+            import traceback
+            traceback.print_exc()
             return False
 
     def _speak_espeak_soft(self, text: str):
@@ -180,6 +308,7 @@ class VoiceEngine:
                 samplerate=self.sample_rate,
                 channels=self.channels,
                 dtype="int16",
+                device=self._audio_device,
             )
             sd.wait()
 
@@ -250,6 +379,7 @@ class VoiceEngine:
                 dtype="int16",
                 channels=1,
                 callback=audio_callback,
+                device=self._audio_device,
             ):
                 import time
 

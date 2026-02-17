@@ -19,8 +19,16 @@ from PyQt5.QtWidgets import (
     QScrollArea,
     QGraphicsOpacityEffect,
 )
-from PyQt5.QtCore import Qt, QTimer, QPropertyAnimation, QEasingCurve, pyqtProperty
+from PyQt5.QtCore import Qt, QTimer, QPropertyAnimation, QEasingCurve, pyqtProperty, pyqtSignal, QObject
 from PyQt5.QtGui import QPainter, QColor, QPen, QFont, QLinearGradient, QBrush
+
+
+class SignalEmitter(QObject):
+    """Thread-safe signal emitter for GUI updates"""
+    transcription_update = pyqtSignal(str)
+    message_add = pyqtSignal(str, bool)  # text, is_user
+    state_change = pyqtSignal(str, str)  # state, status_text
+    voice_finished = pyqtSignal()
 
 # Color palette from "Her" movie
 COLORS = {
@@ -185,6 +193,12 @@ class SamanthaWindow(QMainWindow):
 
     def __init__(self):
         super().__init__()
+        # Thread-safe signal emitter
+        self.signals = SignalEmitter()
+        self.signals.transcription_update.connect(self._update_transcription)
+        self.signals.message_add.connect(self._add_message_slot)
+        self.signals.state_change.connect(self._set_state_slot)
+        self.signals.voice_finished.connect(self._voice_finished_slot)
         self.init_ui()
 
     def init_ui(self):
@@ -394,6 +408,31 @@ class SamanthaWindow(QMainWindow):
         QTimer.singleShot(
             100, lambda: self.chat_widget.scroll(0, self.chat_widget.height())
         )
+
+    # Thread-safe slot methods (called via signals from background threads)
+    def _update_transcription(self, text):
+        """Update transcription label (thread-safe via signal)"""
+        if text:
+            self.transcription_label.setText(text)
+            self.transcription_label.show()
+        else:
+            self.transcription_label.hide()
+
+    def _add_message_slot(self, text, is_user):
+        """Add message to chat (thread-safe via signal)"""
+        self.add_message(text, is_user)
+
+    def _set_state_slot(self, state, status_text):
+        """Set UI state (thread-safe via signal)"""
+        self.pulse_widget.set_state(state)
+        if status_text:
+            self.status_label.setText(status_text)
+
+    def _voice_finished_slot(self):
+        """Handle voice input finished"""
+        self.voice_btn.setChecked(False)
+        self.voice_label.setText("Hold to speak")
+        QTimer.singleShot(2000, self.transcription_label.hide)
 
 
 def main():
