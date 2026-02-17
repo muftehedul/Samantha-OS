@@ -56,9 +56,11 @@ class VoiceEngine:
         try:
             from faster_whisper import WhisperModel
             print("[Samantha] Loading Whisper model...")
-            # Use tiny model for fast real-time transcription
-            self.whisper_model = WhisperModel('tiny', device='cpu', compute_type='int8')
-            print("[Samantha] Voice ready (Whisper)")
+            # Use base model for better accuracy (still fast on CPU)
+            # base model is much more accurate than tiny for real-world audio
+            self.whisper_model = WhisperModel('base', device='cpu', compute_type='int8', 
+                                             num_workers=2, download_root=os.path.expanduser("~/.cache/whisper"))
+            print("[Samantha] Voice ready (Whisper base model)")
         except ImportError:
             print("[Samantha] faster-whisper not found, falling back to Vosk")
             self._init_vosk()

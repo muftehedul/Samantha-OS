@@ -58,7 +58,8 @@ def gui_mode(config_path: str):
         window = SamanthaWindow()
 
         def on_response(text):
-            window.add_message(text, is_user=False)
+            # Use signal for thread-safe GUI update
+            window.signals.message_add.emit(text, False)
             # Don't speak here - let voice mode handle it separately
             # Text mode speaks via separate thread below
 
@@ -76,6 +77,7 @@ def gui_mode(config_path: str):
                 def process_in_thread():
                     try:
                         response = samantha.process_text_input(text)
+                        # Response is already added via callback
                         # Speak response for text input mode
                         samantha.speak(response)
                     except Exception as e:
@@ -85,170 +87,255 @@ def gui_mode(config_path: str):
                 
                 threading.Thread(target=process_in_thread, daemon=True).start()
 
+        continuous_mode = {"active": False}
+
         def toggle_voice(checked):
             if checked:
+                continuous_mode["active"] = True
+                window.voice_label.setText("Tap to stop")
+                start_continuous_conversation()
+            else:
+                continuous_mode["active"] = False
+                window.signals.state_change.emit("idle", "Online")
+                window.voice_label.setText("Hold to speak")
+                window.transcription_label.hide()
+
+        def start_continuous_conversation():
+            def conversation_loop():
+                while continuous_mode["active"] and window.voice_btn.isChecked():
+                    listen_and_process()
+                    if not continuous_mode["active"]:
+                        break
+            
+            threading.Thread(target=conversation_loop, daemon=True).start()
+
+        def listen_and_process():
+            if not continuous_mode["active"]:
+                return
+            
+            import sounddevice as sd
+            import numpy as np
+            import wave
+            import tempfile
+            import os
+            import time
+            import json
+            from vosk import KaldiRecognizer
+            
+            try:
                 window.signals.state_change.emit("listening", "Listening...")
-                window.voice_label.setText("Listening...")
-                window.transcription_label.setText("🎤 Speak...")
+                window.signals.transcription_update.emit("🎤 Speak now...")
                 window.transcription_label.show()
-
-                def listen_and_process():
-                    import sounddevice as sd
-                    import numpy as np
-                    import wave
-                    import tempfile
-                    import os
-                    import time
-                    import json
-                    from vosk import KaldiRecognizer
+                
+                # Use 48kHz native rate for best quality
+                sample_rate = 48000
+                target_rate = 16000  # Whisper expects 16kHz
+                
+                # Vosk for real-time feedback
+                recognizer = None
+                if samantha.voice_engine.vosk_model:
+                    recognizer = KaldiRecognizer(samantha.voice_engine.vosk_model, target_rate)
+                    recognizer.SetWords(True)
+                
+                all_audio = []
+                start_time = time.time()
+                last_speech_time = None
+                speech_detected = False
+                silence_threshold = 0.003  # Adaptive threshold
+                
+                # Smaller chunks for responsive visualization
+                chunk_size = 1024
+                
+                def audio_callback(indata, frames, time_info, status):
+                    nonlocal all_audio, speech_detected, last_speech_time, silence_threshold
                     
-                    try:
-                        sample_rate = 16000
+                    if not continuous_mode["active"]:
+                        raise sd.CallbackStop()
+                    
+                    # Handle stereo/mono
+                    audio_array = indata[:, 0] if indata.ndim > 1 else indata.flatten()
+                    all_audio.append(audio_array.copy())
+                    
+                    # Calculate RMS with proper scaling
+                    rms = np.sqrt(np.mean(audio_array**2))
+                    
+                    # Adaptive threshold - learn from background noise
+                    if len(all_audio) < 10:  # First 10 chunks
+                        silence_threshold = max(silence_threshold, rms * 1.5)
+                    
+                    # Balanced noise gate - filters background but allows normal speech
+                    if rms < silence_threshold * 1.0:  # Balanced (was 1.5)
+                        vis_level = 0.0
+                    else:
+                        clean_rms = max(0, rms - silence_threshold * 0.7)  # Moderate subtraction
+                        vis_level = min(1.0, clean_rms * 70)  # Balanced amplification
+                    
+                    window.pulse_widget.set_audio_level(vis_level)
+                    
+                    # Update volume indicator
+                    if speech_detected:
+                        window.update_volume_indicator(vis_level)
+                    
+                    # Speech detection with balanced threshold
+                    if rms > silence_threshold * 1.3:  # Moderate (was 1.8)
+                        speech_detected = True
+                        last_speech_time = time.time()
+                    
+                    # Real-time transcription with Vosk
+                    if recognizer and speech_detected:
+                        # Downsample 48kHz -> 16kHz (every 3rd sample)
+                        downsampled = audio_array[::3]
+                        audio_int16 = (downsampled * 32767).astype(np.int16).tobytes()
                         
-                        # Use Vosk for real-time transcription display
-                        recognizer = None
-                        if samantha.voice_engine.vosk_model:
-                            recognizer = KaldiRecognizer(samantha.voice_engine.vosk_model, sample_rate)
-                            recognizer.SetWords(True)
-                        
-                        all_audio = []
-                        start_time = time.time()
-                        last_speech_time = None
-                        speech_detected = False
-                        full_partial = ""
-                        
-                        window.signals.transcription_update.emit("🎤 Listening...")
-                        
-                        # Smoother audio capture with smaller chunks
-                        chunk_size = 2000  # Smaller chunks for smoother display
-                        
-                        def audio_callback(indata, frames, time_info, status):
-                            nonlocal all_audio, speech_detected, last_speech_time, full_partial
-                            audio_array = indata.flatten()
-                            all_audio.append(audio_array.copy())
-                            
-                            # Check audio level for speech detection (lower threshold)
-                            level = np.abs(audio_array).mean()
-                            if level > 200:  # Lower threshold for better detection
-                                speech_detected = True
-                                last_speech_time = time.time()
-                            
-                            # Real-time partial transcription
-                            if recognizer:
-                                data = bytes(indata)
-                                if recognizer.AcceptWaveform(data):
-                                    result = json.loads(recognizer.Result())
-                                    if result.get("text"):
-                                        full_partial = result["text"]
-                                else:
-                                    partial = json.loads(recognizer.PartialResult())
-                                    if partial.get("partial"):
-                                        display = full_partial + " " + partial["partial"] if full_partial else partial["partial"]
-                                        full_partial = display
-                        
-                        # Record with callback
-                        with sd.InputStream(samplerate=sample_rate, channels=1, dtype='int16',
-                                          callback=audio_callback, device=None,
-                                          blocksize=chunk_size, latency='low'):
-                            
-                            last_update = time.time()
-                            
-                            while (time.time() - start_time) < 30:
-                                if not window.voice_btn.isChecked():
-                                    break
-                                
-                                # Show live transcription smoothly
-                                if time.time() - last_update > 0.15:  # Update every 150ms
-                                    if full_partial.strip():
-                                        window.signals.transcription_update.emit(f'🎤 "{full_partial.strip()}"')
-                                    elif speech_detected:
-                                        window.signals.transcription_update.emit("🎤 Processing speech...")
-                                    else:
-                                        window.signals.transcription_update.emit("🎤 Listening...")
-                                    last_update = time.time()
-                                
-                                # Stop after 3 seconds of silence
-                                if speech_detected and last_speech_time:
-                                    silence_duration = time.time() - last_speech_time
-                                    if silence_duration > 3:
-                                        window.signals.transcription_update.emit("⏳ Processing...")
-                                        break
-                                
-                                time.sleep(0.03)  # Smoother polling
-                        
-                        if not speech_detected:
-                            window.signals.transcription_update.emit("❌ No speech detected.")
+                        if recognizer.AcceptWaveform(audio_int16):
+                            result = json.loads(recognizer.Result())
+                            if result.get("text"):
+                                window.signals.transcription_update.emit(f'🎤 "{result["text"]}"')
                         else:
-                            # Combine all audio
-                            audio_data = np.concatenate(all_audio)
-                            
-                            # Trim silence from beginning and end
-                            audio_abs = np.abs(audio_data)
-                            threshold = 200
-                            non_silent = np.where(audio_abs > threshold)[0]
-                            if len(non_silent) > 0:
-                                start_idx = max(0, non_silent[0] - 1600)  # Keep 0.1s before
-                                end_idx = min(len(audio_data), non_silent[-1] + 1600)  # Keep 0.1s after
-                                audio_data = audio_data[start_idx:end_idx]
-                            
-                            # Save to temp file
-                            temp_wav = tempfile.mktemp(suffix='.wav')
-                            with wave.open(temp_wav, 'wb') as wf:
-                                wf.setnchannels(1)
-                                wf.setsampwidth(2)
-                                wf.setframerate(sample_rate)
-                                wf.writeframes(audio_data.tobytes())
-                            
-                            # Transcribe using Whisper
-                            text = ""
-                            if samantha.voice_engine.whisper_model:
-                                segments, info = samantha.voice_engine.whisper_model.transcribe(
-                                    temp_wav, 
-                                    language='en',
-                                    beam_size=5,  # Better accuracy
-                                    vad_filter=True,  # Voice activity detection
-                                    vad_parameters=dict(min_silence_duration_ms=500)
-                                )
-                                text = ''.join([segment.text for segment in segments]).strip()
-                            
-                            os.unlink(temp_wav)
-                            
-                            if text and len(text.strip()) > 0:
-                                window.signals.transcription_update.emit(f'✓ "{text}"')
-                                window.signals.message_add.emit(text, True)
-                                
-                                # Get response
-                                window.signals.state_change.emit("thinking", "Thinking...")
-                                response = samantha.process_text_input(text)
-                                window.signals.message_add.emit(response, False)
-                                
-                                # Speak response and listen again
-                                def speak_and_listen():
-                                    samantha.speak(response)
-                                    time.sleep(0.3)
-                                    if window.voice_btn.isChecked():
-                                        window.signals.state_change.emit("listening", "Listening...")
-                                        window.signals.transcription_update.emit("🎤 Listening...")
-                                
-                                threading.Thread(target=speak_and_listen, daemon=True).start()
-                            else:
-                                window.signals.transcription_update.emit("❌ Could not understand.")
-                                time.sleep(0.3)
-                                if window.voice_btn.isChecked():
-                                    window.signals.transcription_update.emit("🎤 Listening...")
-                                
-                    except Exception as e:
-                        import traceback
-                        traceback.print_exc()
-                        window.signals.transcription_update.emit(f"Error: {str(e)}")
+                            partial = json.loads(recognizer.PartialResult())
+                            if partial.get("partial"):
+                                window.signals.transcription_update.emit(f'🎤 "{partial["partial"]}"')
+                
+                # Start recording
+                with sd.InputStream(samplerate=sample_rate, channels=1, dtype='float32',
+                                  callback=audio_callback, device=None, blocksize=chunk_size):
                     
-                    window.signals.voice_finished.emit()
-                    window.signals.state_change.emit("idle", "Online")
-
-                threading.Thread(target=listen_and_process, daemon=True).start()
+                    while (time.time() - start_time) < 30:
+                        if not continuous_mode["active"]:
+                            break
+                        
+                        # Auto-stop after 1.8 seconds of silence
+                        if speech_detected and last_speech_time:
+                            if (time.time() - last_speech_time) > 1.8:
+                                window.signals.transcription_update.emit("⏳ Processing...")
+                                break
+                        
+                        time.sleep(0.02)
+                
+                # Reset visualization
+                window.pulse_widget.set_audio_level(0)
+                window.volume_indicator.hide()
+                
+                if not speech_detected:
+                    window.signals.transcription_update.emit("❌ No speech detected")
+                    time.sleep(1)
+                    return
+                
+                # === PROFESSIONAL AUDIO PROCESSING ===
+                
+                # 1. Combine audio
+                audio_data = np.concatenate(all_audio)
+                
+                # 2. Gentle high-pass filter (remove only very low frequencies)
+                from scipy import signal as sp_signal
+                sos = sp_signal.butter(3, 60, 'hp', fs=sample_rate, output='sos')
+                audio_data = sp_signal.sosfilt(sos, audio_data)
+                
+                # 3. Simple trimming - less aggressive
+                win_size = 480
+                hop_size = 240
+                rms_values = []
+                for i in range(0, len(audio_data) - win_size, hop_size):
+                    win = audio_data[i:i+win_size]
+                    rms_values.append(np.sqrt(np.mean(win**2)))
+                
+                rms_values = np.array(rms_values)
+                
+                # Less aggressive trimming
+                if len(rms_values) > 0:
+                    noise_floor = np.percentile(rms_values, 5)
+                    speech_threshold = noise_floor * 2.5
+                    
+                    speech_mask = rms_values > speech_threshold
+                    
+                    if np.any(speech_mask):
+                        first_speech = np.argmax(speech_mask) * hop_size
+                        last_speech = (len(speech_mask) - np.argmax(speech_mask[::-1]) - 1) * hop_size
+                        
+                        # Generous padding
+                        start_idx = max(0, first_speech - 4800)
+                        end_idx = min(len(audio_data), last_speech + 9600)
+                        audio_data = audio_data[start_idx:end_idx]
+                
+                # 4. Normalize to 0.85
+                max_val = np.abs(audio_data).max()
+                if max_val > 0:
+                    audio_data = audio_data / max_val * 0.85
+                
+                # 5. Resample to 16kHz
+                from scipy.signal import resample_poly
+                audio_16k = resample_poly(audio_data, target_rate, sample_rate)
+                
+                # 6. Convert to int16
+                audio_16k = np.clip(audio_16k * 32767, -32768, 32767).astype(np.int16)
+                
+                # 7. Save to WAV
+                temp_wav = tempfile.mktemp(suffix='.wav')
+                with wave.open(temp_wav, 'wb') as wf:
+                    wf.setnchannels(1)
+                    wf.setsampwidth(2)
+                    wf.setframerate(target_rate)
+                    wf.writeframes(audio_16k.tobytes())
+                
+                # 8. Transcribe with balanced Whisper settings
+                text = ""
+                if samantha.voice_engine.whisper_model:
+                    segments, info = samantha.voice_engine.whisper_model.transcribe(
+                        temp_wav,
+                        language='en',
+                        beam_size=5,
+                        best_of=5,
+                        temperature=0.0,
+                        compression_ratio_threshold=2.4,
+                        log_prob_threshold=-1.0,
+                        no_speech_threshold=0.5,
+                        condition_on_previous_text=False,
+                        vad_filter=True,
+                        vad_parameters=dict(
+                            threshold=0.5,
+                            min_speech_duration_ms=250,
+                            min_silence_duration_ms=500,
+                            speech_pad_ms=400
+                        )
+                    )
+                    text = ''.join([seg.text for seg in segments]).strip()
+                
+                os.unlink(temp_wav)
+                
+                if text:
+                    window.signals.transcription_update.emit(f'✓ "{text}"')
+                    window.signals.message_add.emit(text, True)
+                    
+                    # Check test accuracy if in test mode
+                    if window.test_mode_active:
+                        window.check_test_accuracy(text)
+                        time.sleep(2)
+                        return  # Don't process response in test mode
+                    
+                    window.signals.state_change.emit("thinking", "Thinking...")
+                    response = samantha.process_text_input(text)
+                    window.signals.message_add.emit(response, False)
+                    
+                    window.signals.state_change.emit("speaking", "Speaking...")
+                    samantha.speak(response)
+                    time.sleep(0.5)
+                else:
+                    window.signals.transcription_update.emit("❌ Could not understand")
+                    time.sleep(1)
+                    
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
+                window.signals.transcription_update.emit(f"Error: {str(e)}")
+                time.sleep(2)
 
         window.send_btn.clicked.connect(send_message)
+        window.input_field.send_callback = send_message  # Connect Enter key
         window.voice_btn.clicked.connect(toggle_voice)
+        
+        # Disable test mode for normal use
+        # window.next_test_btn.clicked.connect(window.show_next_test)
+        # window.start_test_mode()
         
         window.show()
 

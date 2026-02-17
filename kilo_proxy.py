@@ -85,8 +85,18 @@ def chat_completions():
     print(f"[Kilo Proxy] Message: {user_message[:100]}...", file=sys.stderr)
 
     try:
+        # Use full path to kilo and set working directory
+        import os
+        kilo_path = os.path.expanduser("~/.kilo/bin/kilo")
+        if not os.path.exists(kilo_path):
+            kilo_path = "kilo"  # Fallback to PATH
+        
+        # Use home directory as working directory
+        work_dir = os.path.expanduser("~")
+            
         result = subprocess.run(
-            ["kilo", "run", "-m", model, user_message, "--format", "json", "--auto"],
+            [kilo_path, "run", "-m", model, user_message, "--format", "json", "--auto"],
+            cwd=work_dir,
             capture_output=True,
             text=True,
             timeout=180,

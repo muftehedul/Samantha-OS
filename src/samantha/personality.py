@@ -49,6 +49,13 @@ class SamanthaPersonality:
 
         # Don't modify LLM responses - they already have personality
         return response
+    
+    def generate_response(self, user_input: str, conversation_history: list, emotional_state: str = "warm") -> str:
+        """Generate response using workflow context"""
+        # This will be called by core with workflow context
+        # For now, return a warm acknowledgment
+        return f"I hear you. Let me think about that..."
+        return response
         if self._is_already_warm(response):
             return response
 
