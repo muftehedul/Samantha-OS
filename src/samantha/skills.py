@@ -7,6 +7,7 @@ import os
 import subprocess
 import psutil
 from datetime import datetime
+import pytz
 
 
 class SystemSkills:
@@ -15,17 +16,30 @@ class SystemSkills:
     def __init__(self, restricted=False):
         self.restricted = restricted
     
+    def get_datetime(self):
+        """Get current date and time"""
+        now = datetime.now()
+        return {
+            'datetime': now.strftime("%Y-%m-%d %H:%M:%S"),
+            'date': now.strftime("%A, %B %d, %Y"),
+            'time': now.strftime("%I:%M %p"),
+            'day': now.strftime("%A"),
+            'timestamp': now.timestamp()
+        }
+    
     def execute_command(self, command):
-        """Execute system command"""
+        """Execute system command and return detailed results"""
         try:
             result = subprocess.run(
                 command, shell=True, capture_output=True, 
                 text=True, timeout=30
             )
             return {
-                'success': True,
-                'output': result.stdout,
-                'error': result.stderr
+                'success': result.returncode == 0,
+                'output': result.stdout.strip(),
+                'error': result.stderr.strip(),
+                'return_code': result.returncode,
+                'command': command
             }
         except Exception as e:
             return {'success': False, 'error': str(e)}

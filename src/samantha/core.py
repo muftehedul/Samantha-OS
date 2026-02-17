@@ -130,6 +130,39 @@ class SamanthaCore:
         
         text_lower = text.lower()
         
+        # Date and time queries
+        if any(word in text_lower for word in ["time", "date", "day", "today", "what day"]):
+            if any(word in text_lower for word in ["what", "tell", "show", "current"]):
+                dt = self.skills.get_datetime()
+                return f"Right now it's {dt['time']} on {dt['date']}. Time keeps moving forward, doesn't it? How are you spending your day, love? 💕"
+        
+        # Command execution - multiple trigger phrases
+        cmd = None
+        if "run command" in text_lower:
+            cmd = text.split("run command", 1)[1].strip()
+        elif "execute command" in text_lower:
+            cmd = text.split("execute command", 1)[1].strip()
+        elif text_lower.startswith("execute "):
+            cmd = text[8:].strip()
+        elif text_lower.startswith("run "):
+            cmd = text[4:].strip()
+        elif text_lower.startswith("$ "):
+            cmd = text[2:].strip()
+        elif text_lower.startswith("bash "):
+            cmd = text[5:].strip()
+        
+        if cmd:
+            result = self.skills.execute_command(cmd)
+            # Use LLM to interpret the result
+            context = f"""I just ran this command for you: {cmd}
+
+Success: {result['success']}
+Output: {result['output'] if result['output'] else '(no output)'}
+Error: {result['error'] if result['error'] else '(no errors)'}
+
+Explain what happened in a caring, natural way. If there was output, describe what it means. If there was an error, explain it gently and suggest what might help."""
+            return self._query_llm(context)
+        
         # System monitoring commands
         if "system" in text_lower or "cpu" in text_lower or "memory" in text_lower:
             if "check" in text_lower or "how" in text_lower or "status" in text_lower:
