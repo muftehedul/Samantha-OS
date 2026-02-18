@@ -152,15 +152,40 @@ class VoiceEngine:
         return ""
 
     def speak(self, text: str):
-        """Speak with Samantha's soft, warm female voice using Edge TTS"""
+        """Speak with Edge TTS"""
         if not text or not text.strip():
             return
 
         text = text.strip()
         print(f"[Samantha] Speaking: {text[:50]}...")
         
-        # Only use Edge TTS (most natural voice)
-        self._speak_edge_tts(text)
+        import tempfile
+        import os
+        
+        temp_mp3 = tempfile.mktemp(suffix='.mp3')
+        
+        try:
+            # Generate with edge-tts command
+            result = subprocess.run([
+                "edge-tts", 
+                "--voice", "en-US-JennyNeural",
+                "--text", text,
+                "--write-media", temp_mp3
+            ], capture_output=True, timeout=30)
+            
+            if result.returncode != 0:
+                print(f"[Samantha] edge-tts failed: {result.stderr.decode()}")
+                return
+            
+            # Play with mpg123
+            subprocess.run(["mpg123", "-q", temp_mp3], timeout=30)
+            print("[Samantha] Speech completed")
+            
+        except Exception as e:
+            print(f"[Samantha] TTS error: {e}")
+        finally:
+            if os.path.exists(temp_mp3):
+                os.remove(temp_mp3)
 
     def _speak_spd_say(self, text: str):
         """Speak using speech-dispatcher spd-say with female voice"""
@@ -212,9 +237,14 @@ class VoiceEngine:
             
         except Exception as e:
             print(f"[Samantha] Edge TTS error: {e}")
+            raise  # Re-raise to trigger fallback
         finally:
+            # Clean up temp file
             if os.path.exists(temp_mp3):
-                os.unlink(temp_mp3)
+                try:
+                    os.remove(temp_mp3)
+                except:
+                    pass
 
     def _speak_pyttsx3_female(self, text: str) -> bool:
         """Speak with pyttsx3 female voice - warm and soft like Her movie"""

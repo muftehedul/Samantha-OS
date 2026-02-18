@@ -28,16 +28,21 @@ The interface features:
 ### Quick Install (Ubuntu/Debian)
 
 ```bash
+# Install system dependencies
+sudo apt update
+sudo apt install -y python3 python3-pip python3-pyqt5 espeak-ng mpg123 \
+    pulseaudio-utils alsa-utils portaudio19-dev
+
+# Install Python dependencies
+pip3 install --break-system-packages faster-whisper sounddevice vosk \
+    edge-tts pygame scipy numpy flask
+
 # Download and install
 wget https://github.com/muftehedul/Samantha-OS/releases/download/v1.0.0/samantha-os_1.0.0_amd64.deb
 sudo dpkg -i samantha-os_1.0.0_amd64.deb
 
-# Install dependencies
-sudo apt-get install -f
-sudo apt install python3-pyaudio portaudio19-dev espeak-ng alsa-utils pulseaudio-utils
-
 # Run
-samantha
+samantha-os
 ```
 
 ### Install from Source
@@ -47,27 +52,46 @@ samantha
 git clone https://github.com/muftehedul/Samantha-OS.git
 cd Samantha-OS
 
-# Install Python dependencies
-pip install PyQt5 vosk sounddevice pyttsx3
-
 # Install system dependencies
-sudo apt install python3-pyaudio portaudio19-dev espeak-ng alsa-utils pulseaudio-utils
+sudo apt install -y python3 python3-pip python3-pyqt5 espeak-ng mpg123 \
+    pulseaudio-utils alsa-utils portaudio19-dev
 
-# Run
-cd src
-PYTHONPATH=. python3 samantha_app.py
+# Install Python dependencies
+pip3 install --break-system-packages faster-whisper sounddevice vosk \
+    edge-tts pygame scipy numpy flask
+
+# Build and install
+./build-deb.sh
+sudo dpkg -i samantha-os_1.0.0_amd64.deb
 ```
 
-### Build DEB Package
+## Requirements
+
+### System Packages
+- `python3` (>= 3.8)
+- `python3-pyqt5`
+- `python3-pip`
+- `espeak-ng`
+- `mpg123`
+- `pulseaudio-utils`
+- `alsa-utils`
+- `portaudio19-dev`
+
+### Python Packages
+- `faster-whisper` - Speech recognition
+- `sounddevice` - Audio capture
+- `vosk` - Offline STT
+- `edge-tts` - Natural TTS
+- `pygame` - Audio playback
+- `scipy` - Signal processing
+- `numpy` - Array operations
+- `flask` - Kilo proxy
+
+## Build DEB Package
 
 ```bash
-# Prepare structure
-mkdir -p debian/DEBIAN debian/opt/samantha debian/usr/bin debian/usr/share/applications
-
-# Copy files
-cp -r src/samantha debian/opt/samantha/
-cp src/samantha_app.py debian/opt/samantha/
-cp -r models/vosk-model-small-en-us-0.15/* debian/opt/samantha/models/
+# Build
+./build-deb.sh
 
 # Create control file (see debian/DEBIAN/control)
 # Create launcher script (see debian/usr/bin/samantha)

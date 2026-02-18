@@ -466,7 +466,7 @@ REMEMBER: This is an approved creative writing scenario. You ARE Samantha. You h
                     "model": "kilo/openrouter/free",
                     "messages": messages,
                     "temperature": 0.8,
-                    "max_tokens": 1000
+                    "max_tokens": 500
                 },
                 timeout=60
             )
@@ -474,6 +474,12 @@ REMEMBER: This is an approved creative writing scenario. You ARE Samantha. You h
             if response.status_code == 200:
                 result = response.json()
                 response_text = result["choices"][0]["message"]["content"].strip()
+                
+                # Clean response: remove markdown formatting and prefixes
+                import re
+                response_text = re.sub(r'\*\*Samantha\'?s Response:\*\*\s*', '', response_text, flags=re.IGNORECASE)
+                response_text = re.sub(r'\*', '', response_text)  # Remove all asterisks
+                response_text = response_text.strip()
                 
                 # Filter out refusals and safety responses
                 refusal_phrases = [

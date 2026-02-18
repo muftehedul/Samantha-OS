@@ -123,78 +123,99 @@ def gui_mode(config_path: str):
             from vosk import KaldiRecognizer
             
             try:
-                window.signals.state_change.emit("listening", "Listening...")
-                window.signals.transcription_update.emit("🎤 Speak now...")
-                window.transcription_label.show()
-                
+                # Safety check for audio device
+                try:
+                    sd.query_devices()
+                except Exception as e:
+                    print(f"[Samantha] Audio device error: {e}")
+                    window.signals.message.emit("samantha", "I'm having trouble with the microphone. Let's use text instead.")
+                    continuous_mode["active"] = False
+                    window.voice_btn.setChecked(False)
+                    return
                 # Use 48kHz native rate for best quality
                 sample_rate = 48000
                 target_rate = 16000  # Whisper expects 16kHz
                 
-                # Vosk for real-time feedback
+                # Skip Vosk real-time (causes crashes) - only use Whisper at end
                 recognizer = None
-                if samantha.voice_engine.vosk_model:
-                    recognizer = KaldiRecognizer(samantha.voice_engine.vosk_model, target_rate)
-                    recognizer.SetWords(True)
                 
                 all_audio = []
                 start_time = time.time()
                 last_speech_time = None
                 speech_detected = False
-                silence_threshold = 0.003  # Adaptive threshold
+                silence_threshold = 0.001  # Lower threshold for faster detection
+                
+                # Show UI immediately
+                window.signals.state_change.emit("listening", "Listening...")
+                window.signals.transcription_update.emit("🎤 Speak now...")
+                window.transcription_label.show()
                 
                 # Smaller chunks for responsive visualization
                 chunk_size = 1024
                 
                 def audio_callback(indata, frames, time_info, status):
-                    nonlocal all_audio, speech_detected, last_speech_time, silence_threshold
-                    
-                    if not continuous_mode["active"]:
-                        raise sd.CallbackStop()
-                    
-                    # Handle stereo/mono
-                    audio_array = indata[:, 0] if indata.ndim > 1 else indata.flatten()
-                    all_audio.append(audio_array.copy())
-                    
-                    # Calculate RMS with proper scaling
-                    rms = np.sqrt(np.mean(audio_array**2))
-                    
-                    # Adaptive threshold - learn from background noise
-                    if len(all_audio) < 10:  # First 10 chunks
-                        silence_threshold = max(silence_threshold, rms * 1.5)
-                    
-                    # Balanced noise gate - filters background but allows normal speech
-                    if rms < silence_threshold * 1.0:  # Balanced (was 1.5)
-                        vis_level = 0.0
-                    else:
-                        clean_rms = max(0, rms - silence_threshold * 0.7)  # Moderate subtraction
-                        vis_level = min(1.0, clean_rms * 70)  # Balanced amplification
-                    
-                    window.pulse_widget.set_audio_level(vis_level)
-                    
-                    # Update volume indicator
-                    if speech_detected:
-                        window.update_volume_indicator(vis_level)
-                    
-                    # Speech detection with balanced threshold
-                    if rms > silence_threshold * 1.3:  # Moderate (was 1.8)
-                        speech_detected = True
-                        last_speech_time = time.time()
-                    
-                    # Real-time transcription with Vosk
-                    if recognizer and speech_detected:
-                        # Downsample 48kHz -> 16kHz (every 3rd sample)
-                        downsampled = audio_array[::3]
-                        audio_int16 = (downsampled * 32767).astype(np.int16).tobytes()
+                    try:
+                        nonlocal all_audio, speech_detected, last_speech_time, silence_threshold
                         
-                        if recognizer.AcceptWaveform(audio_int16):
-                            result = json.loads(recognizer.Result())
-                            if result.get("text"):
-                                window.signals.transcription_update.emit(f'🎤 "{result["text"]}"')
+                        if not continuous_mode["active"]:
+                            raise sd.CallbackStop()
+                        
+                        if status:
+                            print(f"[Samantha] Audio status: {status}")
+                        
+                        # Handle stereo/mono
+                        audio_array = indata[:, 0] if indata.ndim > 1 else indata.flatten()
+                        all_audio.append(audio_array.copy())
+                        
+                        # Calculate RMS with proper scaling
+                        rms = np.sqrt(np.mean(audio_array**2))
+                        
+                        # Faster adaptive threshold
+                        if len(all_audio) < 5:  # First 5 chunks only
+                            silence_threshold = max(silence_threshold, rms * 1.2)
+                        
+                        # More sensitive noise gate
+                        if rms < silence_threshold * 0.8:
+                            vis_level = 0.0
                         else:
-                            partial = json.loads(recognizer.PartialResult())
-                            if partial.get("partial"):
-                                window.signals.transcription_update.emit(f'🎤 "{partial["partial"]}"')
+                            clean_rms = max(0, rms - silence_threshold * 0.5)
+                            vis_level = min(1.0, clean_rms * 80)
+                        
+                        window.pulse_widget.set_audio_level(vis_level)
+                        
+                        # Update volume indicator
+                        if speech_detected:
+                            window.update_volume_indicator(vis_level)
+                        
+                        # Faster speech detection with silence tracking
+                        if rms > silence_threshold * 1.1:  # More sensitive
+                            if not speech_detected:
+                                speech_detected = True
+                            last_speech_time = time.time()  # Update only when speaking
+                        # If below threshold and we've detected speech, don't update last_speech_time
+                        # This allows the silence timer to work
+                        
+                        # Real-time transcription with Vosk
+                        if recognizer and speech_detected:
+                            try:
+                                # Downsample 48kHz -> 16kHz (every 3rd sample)
+                                downsampled = audio_array[::3]
+                                audio_int16 = (downsampled * 32767).astype(np.int16).tobytes()
+                                
+                                if recognizer.AcceptWaveform(audio_int16):
+                                    result = json.loads(recognizer.Result())
+                                    if result.get("text"):
+                                        window.signals.transcription_update.emit(f'🎤 "{result["text"]}"')
+                                else:
+                                    partial = json.loads(recognizer.PartialResult())
+                                    if partial.get("partial"):
+                                        window.signals.transcription_update.emit(f'🎤 "{partial["partial"]}"')
+                            except Exception as vosk_err:
+                                print(f"[Samantha] Vosk error: {vosk_err}")
+                                # Continue without crashing
+                    except Exception as e:
+                        print(f"[Samantha] Audio callback error: {e}")
+                        # Don't crash, just continue
                 
                 # Start recording
                 with sd.InputStream(samplerate=sample_rate, channels=1, dtype='float32',
@@ -204,9 +225,9 @@ def gui_mode(config_path: str):
                         if not continuous_mode["active"]:
                             break
                         
-                        # Auto-stop after 1.8 seconds of silence
+                        # Auto-stop after 1.2 seconds of silence
                         if speech_detected and last_speech_time:
-                            if (time.time() - last_speech_time) > 1.8:
+                            if (time.time() - last_speech_time) > 1.2:
                                 window.signals.transcription_update.emit("⏳ Processing...")
                                 break
                         
