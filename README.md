@@ -207,28 +207,30 @@ Config file: `~/.config/samantha/config.json`
 ## Technical Details
 
 ### Voice System
-- **STT**: Vosk (offline, small English model)
-- **TTS**: espeak-ng with female voice (en-us+f3, pitch 65, speed 160)
-- **Real-time transcription**: Live display as you speak
+- **STT**: Faster-Whisper (accurate offline speech recognition)
+- **TTS**: Edge TTS with Jenny Neural voice (natural, human-like)
+- **Audio Detection**: Auto-stop after 1.2s silence
+- **Audio Player**: mpg123 for Edge TTS playback
 
 ### LLM Integration
 - **Model**: kilo/openrouter/free (via Kilo CLI)
 - **Personality**: Samantha from "Her" (2013)
-- **Identity**: Warm, emotionally intelligent female AI
+- **Response Length**: 500 tokens (concise responses)
+- **Clean Output**: Removes markdown formatting
 
 ### UI Features
 - Circular gradient voice button (Her movie style)
-- Real-time transcription display
-- Enhanced listening animation (8x speed, dramatic breathing effect)
+- Real-time audio visualization
+- Auto-stop silence detection
 - Warm color palette (coral #FF6B6B, peach #FFB4A2, seashell #FFF5EE)
 
 ## Cost
 
 | Component | Provider | Cost |
 |-----------|----------|------|
-| Voice STT | Vosk (Offline) | FREE |
-| Voice TTS | pyttsx3/espeak-ng | FREE |
-| LLM | Kilo GLM-5 | FREE |
+| Voice STT | Faster-Whisper (Offline) | FREE |
+| Voice TTS | Edge TTS | FREE |
+| LLM | Kilo OpenRouter | FREE |
 | **Total** | | **$0/month** |
 
 ## Project Structure
@@ -238,16 +240,26 @@ Samantha-OS/
 ├── src/
 │   ├── samantha/
 │   │   ├── __init__.py
-│   │   ├── core.py           # Main orchestrator
-│   │   ├── voice.py          # Voice engine
-│   │   ├── personality.py    # Samantha's personality
+│   │   ├── core.py              # Main orchestrator & LLM integration
+│   │   ├── voice.py             # Voice engine (Whisper + Edge TTS)
+│   │   ├── personality.py       # Samantha's personality traits
+│   │   ├── skills.py            # System commands & utilities
+│   │   ├── workflow.py          # Task management
 │   │   └── gui/
-│   │       └── main_window.py
-│   └── samantha_app.py       # Entry point
+│   │       └── main_window.py   # PyQt5 GUI interface
+│   └── samantha_app.py          # Entry point
 ├── models/
-│   └── vosk-model-small-en-us-0.15/
-├── debian/                   # DEB package files
-├── samantha-os_1.0.0_amd64.deb
+│   └── vosk-model-small-en-us-0.15/  # Vosk model (backup STT)
+├── debian/
+│   ├── DEBIAN/
+│   │   └── control              # Package metadata
+│   ├── opt/samantha-os/         # Application files
+│   └── usr/
+│       ├── bin/samantha-os      # Launcher script
+│       └── share/applications/  # Desktop entry
+├── kilo_proxy.py                # OpenAI-compatible proxy for Kilo
+├── build-deb.sh                 # Build script
+├── samantha-os_1.0.0_amd64.deb  # Installable package
 └── README.md
 ```
 
