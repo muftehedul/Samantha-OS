@@ -25,44 +25,197 @@ The interface features:
 
 ## Installation
 
-### Quick Install (Ubuntu/Debian)
+### Prerequisites
 
+Before installing, ensure you have:
+- Ubuntu 20.04+ or Debian 11+
+- 2GB RAM minimum (4GB recommended)
+- 500MB free disk space
+- Working microphone and speakers
+- Internet connection (for initial setup and LLM)
+
+### Method 1: Quick Install (Recommended)
+
+#### Step 1: Install System Dependencies
 ```bash
-# Install system dependencies
 sudo apt update
 sudo apt install -y python3 python3-pip python3-pyqt5 espeak-ng mpg123 \
     pulseaudio-utils alsa-utils portaudio19-dev
+```
 
-# Install Python dependencies
+#### Step 2: Install Python Dependencies
+```bash
 pip3 install --break-system-packages faster-whisper sounddevice vosk \
     edge-tts pygame scipy numpy flask
+```
 
-# Download and install
+**Note**: The `--break-system-packages` flag is needed on Ubuntu 23.04+ due to PEP 668. Alternatively, use a virtual environment.
+
+#### Step 3: Download and Install Package
+```bash
+# Download the .deb package
 wget https://github.com/muftehedul/Samantha-OS/releases/download/v1.0.0/samantha-os_1.0.0_amd64.deb
+
+# Install
 sudo dpkg -i samantha-os_1.0.0_amd64.deb
 
-# Run
+# Fix any missing dependencies
+sudo apt-get install -f
+```
+
+#### Step 4: Launch
+```bash
+# From terminal
+samantha-os
+
+# Or search "Samantha OS" in your application menu
+```
+
+### Method 2: Install from Source
+
+#### Step 1: Clone Repository
+```bash
+git clone https://github.com/muftehedul/Samantha-OS.git
+cd Samantha-OS
+```
+
+#### Step 2: Install System Dependencies
+```bash
+sudo apt update
+sudo apt install -y python3 python3-pip python3-pyqt5 espeak-ng mpg123 \
+    pulseaudio-utils alsa-utils portaudio19-dev
+```
+
+#### Step 3: Install Python Dependencies
+```bash
+pip3 install --break-system-packages faster-whisper sounddevice vosk \
+    edge-tts pygame scipy numpy flask
+```
+
+#### Step 4: Build and Install
+```bash
+# Build .deb package
+./build-deb.sh
+
+# Install
+sudo dpkg -i samantha-os_1.0.0_amd64.deb
+```
+
+#### Step 5: Launch
+```bash
 samantha-os
 ```
 
-### Install from Source
+### Verify Installation
+
+After installation, verify all components are working:
 
 ```bash
-# Clone repository
-git clone https://github.com/muftehedul/Samantha-OS.git
-cd Samantha-OS
+# Check Python packages
+pip3 list | grep -E "faster-whisper|edge-tts|sounddevice|vosk"
 
-# Install system dependencies
-sudo apt install -y python3 python3-pip python3-pyqt5 espeak-ng mpg123 \
-    pulseaudio-utils alsa-utils portaudio19-dev
+# Test Edge TTS
+edge-tts --voice en-US-JennyNeural --text "Hello test" --write-media /tmp/test.mp3
+mpg123 /tmp/test.mp3
 
-# Install Python dependencies
-pip3 install --break-system-packages faster-whisper sounddevice vosk \
-    edge-tts pygame scipy numpy flask
+# Test audio devices
+python3 -c "import sounddevice as sd; print(sd.query_devices())"
+```
 
-# Build and install
-./build-deb.sh
-sudo dpkg -i samantha-os_1.0.0_amd64.deb
+### First Run
+
+On first launch, Samantha will:
+1. Start Kilo proxy server (for LLM integration)
+2. Load Whisper model (~150MB, downloaded automatically)
+3. Load Vosk model (already included)
+4. Initialize voice engine
+5. Open GUI interface
+
+This may take 30-60 seconds on first run.
+
+## Usage
+
+### Voice Mode
+1. Click the 🎤 microphone button
+2. Speak naturally when you see "🎤 Speak now..."
+3. App automatically stops after 1.2 seconds of silence
+4. Samantha responds with natural voice
+
+### Text Mode
+1. Type your message in the input field
+2. Click → or press Enter to send
+3. Samantha responds with voice and text
+
+### Tips
+- Speak clearly at normal volume
+- Wait for "⏳ Processing..." before speaking again
+- Use text mode if microphone issues occur
+- Responses are concise (max 500 tokens)
+
+## Troubleshooting
+
+### Audio Issues
+```bash
+# Check audio devices
+python3 -c "import sounddevice as sd; print(sd.query_devices())"
+
+# Test microphone
+arecord -d 3 test.wav && aplay test.wav
+
+# Add user to audio group
+sudo usermod -a -G audio $USER
+# Logout and login again
+```
+
+### Edge TTS Not Working
+```bash
+# Verify edge-tts is installed
+pip3 list | grep edge-tts
+
+# Test Edge TTS
+edge-tts --voice en-US-JennyNeural --text "Hello test" --write-media /tmp/test.mp3
+mpg123 /tmp/test.mp3
+
+# Reinstall if needed
+pip3 install --break-system-packages --force-reinstall edge-tts
+```
+
+### Missing Dependencies
+```bash
+# Fix package dependencies
+sudo apt-get install -f
+
+# Reinstall Python packages
+pip3 install --break-system-packages faster-whisper sounddevice vosk edge-tts pygame scipy numpy flask
+```
+
+### App Won't Start
+```bash
+# Run from terminal to see errors
+cd /opt/samantha-os
+python3 src/samantha_app.py
+
+# Check if Kilo proxy is running
+ps aux | grep kilo_proxy
+
+# Kill and restart
+pkill -f samantha
+samantha-os
+```
+
+### Microphone Not Detected
+```bash
+# List audio devices
+arecord -l
+
+# Test with specific device
+python3 -c "import sounddevice as sd; sd.default.device = 0; print('Device 0 works')"
+```
+
+## Uninstall
+
+```bash
+sudo dpkg -r samantha-os
 ```
 
 ## Requirements
