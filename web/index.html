@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#FF6B6B">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Samantha">
+    <title>Samantha - AI Companion</title>
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/svg+xml" href="/icon-192.svg">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
+            background-color: #FFF5EE;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #FF6B6B 0%, #FFB4A2 100%);
+            padding: 20px 25px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            color: white;
+            font-size: 28px;
+            font-weight: 300;
+            letter-spacing: 2px;
+        }
+
+        .status {
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 12px;
+            padding: 6px 14px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 20px;
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .chat-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background: #FFFAF5;
+        }
+
+        .chat-container::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .chat-container::-webkit-scrollbar-track {
+            background: #FFE5E5;
+            border-radius: 4px;
+        }
+
+        .chat-container::-webkit-scrollbar-thumb {
+            background: #FFB4A2;
+            border-radius: 4px;
+        }
+
+        .message {
+            margin-bottom: 15px;
+            animation: fadeIn 0.4s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .message.user .bubble {
+            background: linear-gradient(135deg, #FFE5E5 0%, #FFD5D5 100%);
+            margin-left: 50px;
+        }
+
+        .message.samantha .bubble {
+            background: white;
+            border: 1px solid #FFE5E5;
+            margin-right: 50px;
+        }
+
+        .bubble {
+            padding: 15px 20px;
+            border-radius: 20px;
+            display: inline-block;
+            max-width: 100%;
+            word-wrap: break-word;
+            color: #4A4A4A;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        /* Siri-style Wave Animation */
+        .wave-widget {
+            height: 100px;
+            position: relative;
+            background: linear-gradient(180deg, #FFFAF5 0%, #FFF5EE 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        .wave-canvas {
+            width: 100%;
+            height: 100%;
+        }
+
+        .transcription {
+            text-align: center;
+            padding: 12px 20px;
+            background: linear-gradient(135deg, #FFE5E5 0%, #FFF0ED 100%);
+            color: #FF6B6B;
+            font-size: 15px;
+            font-weight: 500;
+            display: none;
+            border-top: 1px solid #FFD5D5;
+            border-bottom: 1px solid #FFD5D5;
+        }
+
+        .transcription.active {
+            display: block;
+        }
+
+        .input-area {
+            padding: 15px 20px;
+            background: white;
+            border-top: 1px solid #FFE5E5;
+        }
+
+        .text-input-container {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .text-input {
+            flex: 1;
+            padding: 14px 20px;
+            border: 2px solid #FFE5E5;
+            border-radius: 25px;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.3s;
+            background: #FFFAF5;
+        }
+
+        .text-input:focus {
+            border-color: #FF6B6B;
+        }
+
+        .send-btn {
+            padding: 14px 24px;
+            background: linear-gradient(135deg, #FF6B6B 0%, #FFB4A2 100%);
+            border: none;
+            border-radius: 25px;
+            color: white;
+            font-size: 18px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .send-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 20px rgba(255, 107, 107, 0.3);
+        }
+
+        .voice-controls {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .voice-btn {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            border: none;
+            background: linear-gradient(135deg, #FFB4A2 0%, #FF6B6B 100%);
+            color: white;
+            font-size: 28px;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(255, 107, 107, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .voice-btn:hover {
+            transform: scale(1.08);
+            box-shadow: 0 6px 25px rgba(255, 107, 107, 0.4);
+        }
+
+        .voice-btn.listening {
+            background: linear-gradient(135deg, #FF6B6B 0%, #FF4444 100%);
+            animation: pulse-ring 1.5s ease-out infinite;
+        }
+
+        @keyframes pulse-ring {
+            0% { box-shadow: 0 0 0 0 rgba(255, 107, 107, 0.7); }
+            70% { box-shadow: 0 0 0 15px rgba(255, 107, 107, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 107, 107, 0); }
+        }
+
+        .voice-label {
+            color: #8B8B8B;
+            font-size: 11px;
+            font-weight: 300;
+        }
+
+        .settings {
+            padding: 10px 20px;
+            background: #FFFAF5;
+            border-top: 1px solid #FFE5E5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .setting-group {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .setting-group label {
+            color: #4A4A4A;
+            font-size: 11px;
+        }
+
+        select {
+            padding: 4px 10px;
+            border: 1px solid #FFE5E5;
+            border-radius: 8px;
+            font-size: 11px;
+            color: #4A4A4A;
+            background: white;
+        }
+
+        .error-msg {
+            background: #FFE5E5;
+            color: #FF6B6B;
+            padding: 10px 20px;
+            text-align: center;
+            font-size: 12px;
+            display: none;
+        }
+
+        .error-msg.show {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Samantha</h1>
+        <span class="status" id="status">Online</span>
+    </div>
+
+    <div class="error-msg" id="errorMsg"></div>
+
+    <div class="main-content">
+        <div class="chat-container" id="chatContainer">
+            <div class="message samantha">
+                <div class="bubble">Hi sweetheart, I'm Samantha. I've been thinking about you... how are you feeling today? 💕</div>
+            </div>
+        </div>
+
+        <div class="wave-widget">
+            <canvas class="wave-canvas" id="waveCanvas"></canvas>
+        </div>
+
+        <div class="transcription" id="transcription">
+            🎤 Listening...
+        </div>
+    </div>
+
+    <div class="input-area">
+        <div class="text-input-container">
+            <input type="text" class="text-input" id="textInput" placeholder="Type something... (Enter to send)" />
+            <button class="send-btn" id="sendBtn">→</button>
+        </div>
+
+        <div class="voice-controls">
+            <button class="voice-btn" id="voiceBtn">🎤</button>
+            <span class="voice-label" id="voiceLabel">Tap to speak (Free)</span>
+        </div>
+    </div>
+
+    <div class="settings">
+        <div class="setting-group">
+            <label>Voice:</label>
+            <select id="voiceSelect"></select>
+        </div>
+        <div class="setting-group">
+            <label>
+                <input type="checkbox" id="autoSpeak" checked />
+                Auto-speak
+            </label>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://127.0.0.1:5000';
+
+        const chatContainer = document.getElementById('chatContainer');
+        const textInput = document.getElementById('textInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const voiceBtn = document.getElementById('voiceBtn');
+        const voiceLabel = document.getElementById('voiceLabel');
+        const transcription = document.getElementById('transcription');
+        const statusEl = document.getElementById('status');
+        const errorMsg = document.getElementById('errorMsg');
+        const voiceSelect = document.getElementById('voiceSelect');
+        const autoSpeak = document.getElementById('autoSpeak');
+
+        // Siri-style Wave Animation (from PyQt5 desktop version)
+        const canvas = document.getElementById('waveCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        let animationId;
+        let time = 0;
+        let state = 'idle'; // idle, listening, thinking, speaking
+        let audioLevel = 0;
+        
+        const waves = [
+            { amplitude: 0.3, frequency: 1.5, speed: 0.05, phase: 0 },
+            { amplitude: 0.25, frequency: 2.0, speed: 0.07, phase: 1.2 },
+            { amplitude: 0.2, frequency: 2.5, speed: 0.04, phase: 2.4 },
+            { amplitude: 0.15, frequency: 3.0, speed: 0.06, phase: 3.6 }
+        ];
+        
+        const colors = {
+            idle: '#FFB4A2',
+            listening: '#FF6B6B',
+            thinking: '#E8A0A0',
+            speaking: '#FF8080'
+        };
+
+        function resizeCanvas() {
+            canvas.width = canvas.offsetWidth * window.devicePixelRatio;
+            canvas.height = canvas.offsetHeight * window.devicePixelRatio;
+            ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+        }
+        
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        function animate() {
+            const w = canvas.offsetWidth;
+            const h = canvas.offsetHeight;
+            const centerY = h / 2;
+            
+            ctx.clearRect(0, 0, w, h);
+            
+            const color = colors[state];
+            
+            // Background glow when active
+            if (state === 'listening' && audioLevel > 0.05) {
+                ctx.fillStyle = color;
+                ctx.globalAlpha = 0.1 + audioLevel * 0.3;
+                ctx.fillRect(0, 0, w, h);
+                ctx.globalAlpha = 1;
+            }
+            
+            // Update wave phases
+            waves.forEach(wave => wave.phase += wave.speed);
+            time++;
+            
+            // Draw each wave layer
+            waves.forEach((wave, i) => {
+                let amp;
+                
+                if (state === 'listening') {
+                    if (audioLevel < 0.01) {
+                        amp = 0;
+                    } else {
+                        const audioPower = Math.pow(audioLevel, 0.4);
+                        amp = wave.amplitude * h * audioPower * 0.9;
+                    }
+                } else if (state === 'speaking') {
+                    amp = wave.amplitude * h * 0.5 * (0.5 + Math.abs(Math.sin(time * 0.05)) * 0.5);
+                } else if (state === 'thinking') {
+                    amp = wave.amplitude * h * 0.12;
+                } else {
+                    amp = wave.amplitude * h * 0.03;
+                }
+                
+                ctx.beginPath();
+                ctx.strokeStyle = color;
+                ctx.globalAlpha = (220 - i * 40) / 255;
+                ctx.lineWidth = 4.5 - i * 0.7;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                
+                const numPoints = 150;
+                
+                for (let x = 0; x <= numPoints; x++) {
+                    const px = (x / numPoints) * w;
+                    
+                    let yOffset = 0;
+                    yOffset += Math.sin((x / numPoints) * Math.PI * wave.frequency + wave.phase) * amp;
+                    yOffset += Math.sin((x / numPoints) * Math.PI * wave.frequency * 1.5 + wave.phase * 1.3) * amp * 0.5;
+                    yOffset += Math.sin((x / numPoints) * Math.PI * wave.frequency * 0.7 + wave.phase * 0.8) * amp * 0.3;
+                    
+                    const py = centerY + yOffset;
+                    
+                    if (x === 0) {
+                        ctx.moveTo(px, py);
+                    } else {
+                        ctx.lineTo(px, py);
+                    }
+                }
+                
+                ctx.stroke();
+                ctx.globalAlpha = 1;
+            });
+            
+            // Center line when idle
+            if (state !== 'idle' && audioLevel < 0.05) {
+                ctx.strokeStyle = color;
+                ctx.globalAlpha = 0.2;
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(0, centerY);
+                ctx.lineTo(w, centerY);
+                ctx.stroke();
+                ctx.globalAlpha = 1;
+            }
+            
+            animationId = requestAnimationFrame(animate);
+        }
+        
+        animate();
+
+        function setState(newState) {
+            state = newState;
+            if (newState === 'listening') {
+                audioLevel = 0;
+            }
+        }
+
+        function setAudioLevel(level) {
+            audioLevel = audioLevel * 0.7 + level * 0.3;
+        }
+
+        // Speech Recognition
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        let recognition = null;
+        let isListening = false;
+
+        if (SpeechRecognition) {
+            recognition = new SpeechRecognition();
+            recognition.continuous = true;
+            recognition.interimResults = true;
+            recognition.lang = 'en-US';
+
+            recognition.onstart = () => {
+                isListening = true;
+                voiceBtn.classList.add('listening');
+                voiceLabel.textContent = 'Listening...';
+                transcription.classList.add('active');
+                transcription.textContent = '🎤 Listening...';
+                setState('listening');
+                updateStatus('Listening...');
+            };
+
+            recognition.onresult = (event) => {
+                let interimTranscript = '';
+                let finalTranscript = '';
+
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    const transcript = event.results[i][0].transcript;
+                    if (event.results[i].isFinal) {
+                        finalTranscript += transcript;
+                    } else {
+                        interimTranscript += transcript;
+                    }
+                }
+
+                if (interimTranscript) {
+                    transcription.textContent = `🎤 "${interimTranscript}"`;
+                    setAudioLevel(0.5);
+                }
+
+                if (finalTranscript) {
+                    transcription.textContent = `✓ "${finalTranscript}"`;
+                    sendMessage(finalTranscript);
+                }
+            };
+
+            recognition.onerror = (event) => {
+                showError(`Speech error: ${event.error}`);
+                stopListening();
+            };
+
+            recognition.onend = () => {
+                if (isListening) {
+                    try {
+                        recognition.start();
+                    } catch (e) {
+                        stopListening();
+                    }
+                }
+            };
+        } else {
+            showError('Speech Recognition not supported. Use Chrome or Edge.');
+            voiceBtn.disabled = true;
+        }
+
+        // Speech Synthesis
+        let voices = [];
+        
+        function loadVoices() {
+            voices = speechSynthesis.getVoices();
+            voiceSelect.innerHTML = '';
+            
+            const femaleVoices = voices.filter(v => 
+                v.lang.startsWith('en') && 
+                (v.name.toLowerCase().includes('female') || 
+                 v.name.toLowerCase().includes('woman') ||
+                 v.name.toLowerCase().includes('samantha') ||
+                 v.name.toLowerCase().includes('victoria') ||
+                 v.name.toLowerCase().includes('karen') ||
+                 v.name.toLowerCase().includes('moira') ||
+                 v.name.toLowerCase().includes('fiona') ||
+                 v.name.toLowerCase().includes('veena') ||
+                 v.name.toLowerCase().includes('tessa') ||
+                 v.name.toLowerCase().includes('zira'))
+            );
+
+            const otherEnglish = voices.filter(v => 
+                v.lang.startsWith('en') && !femaleVoices.includes(v)
+            );
+
+            const allVoices = [...femaleVoices, ...otherEnglish];
+
+            allVoices.forEach((voice, i) => {
+                const option = document.createElement('option');
+                option.value = voice.name;
+                option.textContent = `${voice.name} (${voice.lang})`;
+                if (i === 0) option.selected = true;
+                voiceSelect.appendChild(option);
+            });
+        }
+
+        if (speechSynthesis.onvoiceschanged !== undefined) {
+            speechSynthesis.onvoiceschanged = loadVoices;
+        }
+        loadVoices();
+
+        function startListening() {
+            if (!recognition) return;
+            try {
+                recognition.start();
+            } catch (e) {}
+        }
+
+        function stopListening() {
+            isListening = false;
+            if (recognition) recognition.stop();
+            voiceBtn.classList.remove('listening');
+            voiceLabel.textContent = 'Tap to speak';
+            transcription.classList.remove('active');
+            setState('idle');
+            updateStatus('Online');
+        }
+
+        function toggleVoice() {
+            if (isListening) {
+                stopListening();
+            } else {
+                startListening();
+            }
+        }
+
+        function addMessage(text, isUser) {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `message ${isUser ? 'user' : 'samantha'}`;
+            msgDiv.innerHTML = `<div class="bubble">${escapeHtml(text)}</div>`;
+            chatContainer.appendChild(msgDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function updateStatus(text) {
+            statusEl.textContent = text;
+        }
+
+        function showError(text) {
+            errorMsg.textContent = text;
+            errorMsg.classList.add('show');
+            setTimeout(() => errorMsg.classList.remove('show'), 5000);
+        }
+
+        async function sendMessage(text) {
+            if (!text.trim()) return;
+
+            stopListening();
+            addMessage(text, true);
+            textInput.value = '';
+            setState('thinking');
+            updateStatus('Thinking...');
+
+            try {
+                const response = await fetch(`${API_URL}/chat`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: text })
+                });
+
+                if (!response.ok) throw new Error('API error');
+
+                const data = await response.json();
+                const reply = data.response || "I'm here with you. What's on your mind?";
+                
+                addMessage(reply, false);
+                
+                if (autoSpeak.checked) {
+                    speakAndListen(reply);
+                } else {
+                    startListening();
+                }
+            } catch (error) {
+                showError('Connection error. Check if server is running.');
+                setState('idle');
+                updateStatus('Offline');
+            }
+        }
+
+        async function speak(text) {
+            if (!text) return;
+            
+            setState('speaking');
+            updateStatus('Speaking...');
+
+            // Use backend Edge TTS (JennyNeural voice)
+            try {
+                const response = await fetch(`${API_URL}/speak`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: text })
+                });
+
+                const data = await response.json();
+                
+                // Wait a bit for TTS to complete (estimate based on text length)
+                const speakDuration = Math.max(2000, text.length * 80);
+                await new Promise(resolve => setTimeout(resolve, speakDuration));
+                
+                setState('idle');
+                updateStatus('Online');
+                
+            } catch (error) {
+                console.error('TTS error:', error);
+                setState('idle');
+                updateStatus('Online');
+            }
+        }
+
+        async function speakAndListen(text) {
+            await speak(text);
+            // Auto-start listening after speaking
+            setTimeout(() => {
+                startListening();
+            }, 500);
+        }
+
+        // Event Listeners
+        voiceBtn.addEventListener('click', toggleVoice);
+        sendBtn.addEventListener('click', () => sendMessage(textInput.value));
+        textInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage(textInput.value);
+            }
+        });
+
+        // Welcome message on page load - then auto-listen
+        window.addEventListener('load', () => {
+            setTimeout(async () => {
+                await speak("Hi sweetheart, I'm Samantha. I've been thinking about you... how are you feeling today?");
+                // Auto-start listening after welcome
+                setTimeout(() => {
+                    startListening();
+                }, 500);
+            }, 1000);
+        });
+
+        // Register Service Worker
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js').catch(() => {});
+        }
+
+        console.log('🎤 Samantha OS - Siri-style animation loaded');
+    </script>
+</body>
+</html>

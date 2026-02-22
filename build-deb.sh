@@ -1,14 +1,21 @@
 #!/bin/bash
-# Build Samantha OS .deb package
+# Build Samantha OS .deb package - Simple Web UI
+# Single command launches everything
 
 set -e
 
 APP_NAME="samantha-os"
-VERSION="1.0.0"
+VERSION="2.0.0"
 ARCH="amd64"
 BUILD_DIR="build/${APP_NAME}_${VERSION}_${ARCH}"
 
-echo "Building Samantha OS .deb package..."
+echo "=========================================="
+echo "  Samantha OS v${VERSION} - Web UI"
+echo "=========================================="
+
+# Uninstall previous version
+pkexec apt-get remove -y samantha-os 2>/dev/null || true
+pkexec dpkg --remove samantha-os 2>/dev/null || true
 
 # Clean previous build
 rm -rf build
@@ -16,82 +23,108 @@ mkdir -p "$BUILD_DIR"
 
 # Create directory structure
 mkdir -p "$BUILD_DIR/DEBIAN"
-mkdir -p "$BUILD_DIR/opt/samantha-os"
+mkdir -p "$BUILD_DIR/opt/samantha-os/src/samantha/gui"
+mkdir -p "$BUILD_DIR/opt/samantha-os/web"
 mkdir -p "$BUILD_DIR/usr/share/applications"
-mkdir -p "$BUILD_DIR/usr/share/icons/hicolor/256x256/apps"
+mkdir -p "$BUILD_DIR/usr/share/icons/hicolor/scalable/apps"
 mkdir -p "$BUILD_DIR/usr/bin"
 
-# Copy application files
-cp -r src "$BUILD_DIR/opt/samantha-os/"
+# Copy source files
+cp src/samantha/*.py "$BUILD_DIR/opt/samantha-os/src/samantha/" 2>/dev/null || true
+cp src/samantha/gui/*.py "$BUILD_DIR/opt/samantha-os/src/samantha/gui/" 2>/dev/null || true
+cp src/samantha_app.py "$BUILD_DIR/opt/samantha-os/src/" 2>/dev/null || true
 cp kilo_proxy.py "$BUILD_DIR/opt/samantha-os/"
-cp -r models "$BUILD_DIR/opt/samantha-os/" 2>/dev/null || echo "Models not found, will download on first run"
 
-# Create launcher script
-cat > "$BUILD_DIR/usr/bin/samantha-os" << 'EOF'
+# Copy web files
+cp web/index.html "$BUILD_DIR/opt/samantha-os/web/"
+cp web/manifest.json "$BUILD_DIR/opt/samantha-os/web/" 2>/dev/null || true
+cp web/sw.js "$BUILD_DIR/opt/samantha-os/web/" 2>/dev/null || true
+cp web/*.svg "$BUILD_DIR/opt/samantha-os/web/" 2>/dev/null || true
+cp web_server.py "$BUILD_DIR/opt/samantha-os/"
+
+# Create __init__.py
+touch "$BUILD_DIR/opt/samantha-os/src/samantha/__init__.py"
+
+# Create main launcher
+cat > "$BUILD_DIR/usr/bin/sm" << 'LAUNCHER'
 #!/bin/bash
-# Kill any existing proxy
-pkill -f kilo_proxy.py 2>/dev/null || true
+cd /opt/samantha-os
+
+echo "=========================================="
+echo "  Samantha OS - Starting..."
+echo "=========================================="
+
+# Kill existing
+pkill -f kilo_proxy.py 2>/dev/null
+pkill -f web_server.py 2>/dev/null
 sleep 1
 
-# Start kilo proxy
-cd /opt/samantha-os
-/usr/bin/python3 kilo_proxy.py > /tmp/kilo_proxy.log 2>&1 &
-PROXY_PID=$!
+# Start Kilo Proxy
+echo "[1/2] Starting backend..."
+python3 kilo_proxy.py > /tmp/kilo_proxy.log 2>&1 &
+sleep 3
 
-echo "Starting kilo proxy (PID: $PROXY_PID)..."
+# Start Web Server
+echo "[2/2] Starting web server..."
+python3 web_server.py 2>&1 &
+WEB_PID=$!
 
-# Wait for proxy to be ready
-for i in {1..15}; do
-    if curl -s http://127.0.0.1:8765/v1/models > /dev/null 2>&1; then
-        echo "Proxy ready!"
-        break
-    fi
-    if [ $i -eq 15 ]; then
-        echo "Proxy failed to start. Check /tmp/kilo_proxy.log"
-        cat /tmp/kilo_proxy.log
-        exit 1
-    fi
-    sleep 1
-done
+sleep 2
 
-cd /opt/samantha-os
-exec /usr/bin/python3 src/samantha_app.py "$@"
-EOF
-chmod +x "$BUILD_DIR/usr/bin/samantha-os"
+echo ""
+echo "=========================================="
+echo "  Samantha OS is running!"
+echo "  Web UI: http://127.0.0.1:5000"
+echo "=========================================="
+echo ""
+echo "🎤 Click mic button to speak"
+echo "🔊 Voice responses enabled"
+echo ""
+echo "Press Ctrl+C to stop"
+echo ""
 
-# Create GUI launcher wrapper
-cat > "$BUILD_DIR/usr/bin/samantha-os-gui" << 'EOF'
+# Open browser
+xdg-open http://127.0.0.1:5000 2>/dev/null &
+
+wait $WEB_PID
+LAUNCHER
+chmod +x "$BUILD_DIR/usr/bin/sm"
+
+# Create CLI launcher
+cat > "$BUILD_DIR/usr/bin/sm-cli" << 'EOF'
 #!/bin/bash
-# GUI launcher - ensures proper environment
-export DISPLAY="${DISPLAY:-:0}"
-export DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-unix:path=/run/user/$(id -u)/bus}"
-
-# Log to file for debugging
-exec /usr/bin/samantha-os 2>&1 | tee /tmp/samantha-os-gui.log
+cd /opt/samantha-os
+exec python3 src/samantha_app.py --cli "$@"
 EOF
-chmod +x "$BUILD_DIR/usr/bin/samantha-os-gui"
+chmod +x "$BUILD_DIR/usr/bin/sm-cli"
+
+# Create icon
+cat > "$BUILD_DIR/usr/share/icons/hicolor/scalable/apps/samantha-os.svg" << 'EOF'
+<svg width="512" height="512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FF6B6B"/>
+      <stop offset="100%" style="stop-color:#FFB4A2"/>
+    </linearGradient>
+  </defs>
+  <circle cx="256" cy="256" r="240" fill="url(#grad)"/>
+  <circle cx="256" cy="256" r="150" fill="#FFE5E5"/>
+  <circle cx="256" cy="256" r="70" fill="#FF6B6B"/>
+</svg>
+EOF
 
 # Create desktop entry
 cat > "$BUILD_DIR/usr/share/applications/samantha-os.desktop" << EOF
 [Desktop Entry]
 Version=1.0
 Type=Application
-Name=Samantha OS
-Comment=AI Voice Assistant inspired by "Her"
-Exec=/usr/bin/samantha-os-gui
+Name=Samantha
+Comment=AI Voice Assistant
+Exec=/usr/bin/sm
 Icon=samantha-os
-Terminal=false
-Categories=Utility;AudioVideo;
-Keywords=ai;assistant;voice;samantha;
-EOF
-
-# Create icon (simple SVG)
-cat > "$BUILD_DIR/usr/share/icons/hicolor/256x256/apps/samantha-os.svg" << 'EOF'
-<svg width="256" height="256" xmlns="http://www.w3.org/2000/svg">
-  <circle cx="128" cy="128" r="120" fill="#FF6B6B"/>
-  <circle cx="128" cy="128" r="80" fill="#FFB4A2"/>
-  <circle cx="128" cy="128" r="40" fill="#FFE5E5"/>
-</svg>
+Terminal=true
+Categories=Utility;
+Keywords=ai;voice;samantha;
 EOF
 
 # Create control file
@@ -101,43 +134,42 @@ Version: ${VERSION}
 Section: utils
 Priority: optional
 Architecture: ${ARCH}
-Depends: python3 (>= 3.8), python3-pyqt5, python3-numpy, python3-psutil, python3-pip
-Maintainer: Samantha OS Team <samantha@example.com>
-Description: AI Voice Assistant inspired by "Her"
- Samantha OS is a caring AI voice assistant with full system capabilities.
- Features:
-  - Natural voice interaction
-  - System monitoring and control
-  - Task scheduling and reminders
-  - Memory and learning
-  - Beautiful Siri-like UI
+Depends: python3 (>= 3.8), python3-flask, python3-requests, curl
+Maintainer: Samantha OS <samantha@example.com>
+Description: AI Voice Assistant with FREE Browser Speech
+ Samantha OS - AI companion inspired by "Her" (2013).
+ .
+ Run 'samantha-os' to start. Opens web UI in browser.
+ Uses FREE browser speech recognition (Chrome/Edge).
 EOF
 
-# Create postinst script
+# Create postinst
 cat > "$BUILD_DIR/DEBIAN/postinst" << 'EOF'
 #!/bin/bash
-set -e
-
-echo "Installing Python dependencies..."
-pip3 install --break-system-packages faster-whisper sounddevice vosk pygame edge-tts flask scipy 2>/dev/null || true
-
-echo "Samantha OS installed successfully!"
-echo "Run 'samantha-os' to start"
-exit 0
+gtk-update-icon-cache -f /usr/share/icons/hicolor/ 2>/dev/null || true
+echo ""
+echo "✓ Samantha OS installed!"
+echo "  Run: sm"
+echo "  Web: http://127.0.0.1:5000"
 EOF
 chmod +x "$BUILD_DIR/DEBIAN/postinst"
 
-# Build the package
-dpkg-deb --build "$BUILD_DIR"
+# Create prerm
+cat > "$BUILD_DIR/DEBIAN/prerm" << 'EOF'
+#!/bin/bash
+pkill -f web_server.py 2>/dev/null || true
+pkill -f kilo_proxy.py 2>/dev/null || true
+EOF
+chmod +x "$BUILD_DIR/DEBIAN/prerm"
 
-# Move to current directory
-mv "build/${APP_NAME}_${VERSION}_${ARCH}.deb" .
+# Build
+echo "Building..."
+dpkg-deb --build --root-owner-group "$BUILD_DIR" 2>/dev/null || dpkg-deb --build "$BUILD_DIR"
 
-echo "✓ Package created: ${APP_NAME}_${VERSION}_${ARCH}.deb"
+# Install
 echo ""
-echo "To install:"
-echo "  sudo dpkg -i ${APP_NAME}_${VERSION}_${ARCH}.deb"
-echo "  sudo apt-get install -f  # Fix dependencies if needed"
+echo "Installing..."
+pkexec dpkg -i "build/${APP_NAME}_${VERSION}_${ARCH}.deb"
+
 echo ""
-echo "To run:"
-echo "  samantha-os"
+echo "✓ Done! Run: sm"

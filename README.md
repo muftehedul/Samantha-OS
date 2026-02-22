@@ -1,331 +1,147 @@
 # Samantha OS
 
-An AI Assistant inspired by the movie **"Her"** (2013) - A warm, emotionally intelligent AI companion with a minimalist interface.
+An AI Assistant inspired by the movie **"Her" (2013)** - A warm, emotionally intelligent AI companion with a beautiful web interface.
 
-![Samantha OS](https://img.shields.io/badge/version-1.0.0-coral)
+![Samantha OS](https://img.shields.io/badge/version-2.0.0-coral)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 ![Platform](https://img.shields.io/badge/platform-Linux-orange)
 
-## Features
+## ✨ Features
 
-- 🎤 **Voice Input**: Offline speech-to-text via Vosk
-- 🔊 **Natural Voice**: Soft, warm text-to-speech
-- 💭 **Emotional Intelligence**: Empathetic, thoughtful responses
-- 🎨 **Minimalist UI**: "Her"-inspired warm color palette
-- 🔒 **Privacy First**: All voice processing happens locally
-- 💰 **100% Free**: No API keys required
+- 🎤 **FREE Browser Speech Recognition** - No Vosk/Whisper needed, uses browser's native Web Speech API
+- 🔊 **Natural Voice** - Edge TTS with JennyNeural voice (warm, human-like)
+- 💭 **Emotional Intelligence** - Empathetic, thoughtful responses
+- 🎨 **Beautiful Web UI** - Siri-style wave animation, Her-movie inspired design
+- 🔄 **Auto-Listen Mode** - Continuous conversation flow
+- 💰 **100% Free** - No API keys required for speech features
+- 🌐 **PWA Support** - Installable as desktop app
 
-## Screenshots
+## 🚀 Quick Install
 
-The interface features:
-- Warm coral and peach color palette
-- Soft pulsing presence indicator
-- Conversation-focused design
-- Minimalist, elegant typography
+### Method 1: Install from .deb package (Recommended)
 
-## Installation
-
-### Prerequisites
-
-Before installing, ensure you have:
-- Ubuntu 20.04+ or Debian 11+
-- 2GB RAM minimum (4GB recommended)
-- 500MB free disk space
-- Working microphone and speakers
-- Internet connection (for initial setup and LLM)
-
-### Method 1: Quick Install (Recommended)
-
-#### Step 1: Install System Dependencies
 ```bash
-sudo apt update
-sudo apt install -y python3 python3-pip python3-pyqt5 espeak-ng mpg123 \
-    pulseaudio-utils alsa-utils portaudio19-dev
-```
+# Download and install
+wget https://github.com/muftehedul/Samantha-OS/releases/download/v2.0.0/samantha-os_2.0.0_amd64.deb
+sudo dpkg -i samantha-os_2.0.0_amd64.deb
 
-#### Step 2: Install Python Dependencies
-```bash
-pip3 install --break-system-packages faster-whisper sounddevice vosk \
-    edge-tts pygame scipy numpy flask
-```
-
-**Note**: The `--break-system-packages` flag is needed on Ubuntu 23.04+ due to PEP 668. Alternatively, use a virtual environment.
-
-#### Step 3: Download and Install Package
-```bash
-# Download the .deb package
-wget https://github.com/muftehedul/Samantha-OS/releases/download/v1.0.0/samantha-os_1.0.0_amd64.deb
-
-# Install
-sudo dpkg -i samantha-os_1.0.0_amd64.deb
-
-# Fix any missing dependencies
-sudo apt-get install -f
-```
-
-#### Step 4: Launch
-```bash
-# From terminal
-samantha-os
-
-# Or search "Samantha OS" in your application menu
+# Run
+sm
 ```
 
 ### Method 2: Install from Source
 
-#### Step 1: Clone Repository
 ```bash
+# Clone repository
 git clone https://github.com/muftehedul/Samantha-OS.git
 cd Samantha-OS
-```
 
-#### Step 2: Install System Dependencies
-```bash
+# Install dependencies
 sudo apt update
-sudo apt install -y python3 python3-pip python3-pyqt5 espeak-ng mpg123 \
-    pulseaudio-utils alsa-utils portaudio19-dev
-```
+sudo apt install -y python3 python3-pip python3-flask curl
+pip3 install --break-system-packages flask requests edge-tts
 
-#### Step 3: Install Python Dependencies
-```bash
-pip3 install --break-system-packages faster-whisper sounddevice vosk \
-    edge-tts pygame scipy numpy flask
-```
-
-#### Step 4: Build and Install
-```bash
-# Build .deb package
+# Build and install
 ./build-deb.sh
 
-# Install
-sudo dpkg -i samantha-os_1.0.0_amd64.deb
+# Run
+sm
 ```
 
-#### Step 5: Launch
-```bash
-samantha-os
-```
-
-### Verify Installation
-
-After installation, verify all components are working:
-
-```bash
-# Check Python packages
-pip3 list | grep -E "faster-whisper|edge-tts|sounddevice|vosk"
-
-# Test Edge TTS
-edge-tts --voice en-US-JennyNeural --text "Hello test" --write-media /tmp/test.mp3
-mpg123 /tmp/test.mp3
-
-# Test audio devices
-python3 -c "import sounddevice as sd; print(sd.query_devices())"
-```
-
-### First Run
-
-On first launch, Samantha will:
-1. Start Kilo proxy server (for LLM integration)
-2. Load Whisper model (~150MB, downloaded automatically)
-3. Load Vosk model (already included)
-4. Initialize voice engine
-5. Open GUI interface
-
-This may take 30-60 seconds on first run.
-
-## Usage
-
-### Voice Mode
-1. Click the 🎤 microphone button
-2. Speak naturally when you see "🎤 Speak now..."
-3. App automatically stops after 1.2 seconds of silence
-4. Samantha responds with natural voice
-
-### Text Mode
-1. Type your message in the input field
-2. Click → or press Enter to send
-3. Samantha responds with voice and text
-
-### Tips
-- Speak clearly at normal volume
-- Wait for "⏳ Processing..." before speaking again
-- Use text mode if microphone issues occur
-- Responses are concise (max 500 tokens)
-
-## Troubleshooting
-
-### Audio Issues
-```bash
-# Check audio devices
-python3 -c "import sounddevice as sd; print(sd.query_devices())"
-
-# Test microphone
-arecord -d 3 test.wav && aplay test.wav
-
-# Add user to audio group
-sudo usermod -a -G audio $USER
-# Logout and login again
-```
-
-### Edge TTS Not Working
-```bash
-# Verify edge-tts is installed
-pip3 list | grep edge-tts
-
-# Test Edge TTS
-edge-tts --voice en-US-JennyNeural --text "Hello test" --write-media /tmp/test.mp3
-mpg123 /tmp/test.mp3
-
-# Reinstall if needed
-pip3 install --break-system-packages --force-reinstall edge-tts
-```
-
-### Missing Dependencies
-```bash
-# Fix package dependencies
-sudo apt-get install -f
-
-# Reinstall Python packages
-pip3 install --break-system-packages faster-whisper sounddevice vosk edge-tts pygame scipy numpy flask
-```
-
-### App Won't Start
-```bash
-# Run from terminal to see errors
-cd /opt/samantha-os
-python3 src/samantha_app.py
-
-# Check if Kilo proxy is running
-ps aux | grep kilo_proxy
-
-# Kill and restart
-pkill -f samantha
-samantha-os
-```
-
-### Microphone Not Detected
-```bash
-# List audio devices
-arecord -l
-
-# Test with specific device
-python3 -c "import sounddevice as sd; sd.default.device = 0; print('Device 0 works')"
-```
-
-## Uninstall
-
-```bash
-sudo dpkg -r samantha-os
-```
-
-## Requirements
+## 📋 Requirements
 
 ### System Packages
 - `python3` (>= 3.8)
-- `python3-pyqt5`
 - `python3-pip`
-- `espeak-ng`
-- `mpg123`
-- `pulseaudio-utils`
-- `alsa-utils`
-- `portaudio19-dev`
+- `python3-flask`
+- `curl`
 
 ### Python Packages
-- `faster-whisper` - Speech recognition
-- `sounddevice` - Audio capture
-- `vosk` - Offline STT
-- `edge-tts` - Natural TTS
-- `pygame` - Audio playback
-- `scipy` - Signal processing
-- `numpy` - Array operations
-- `flask` - Kilo proxy
+- `flask` - Web server
+- `requests` - HTTP client
+- `edge-tts` - Natural TTS (JennyNeural voice)
 
-## Build DEB Package
+### For Best Speech Recognition
+- **Chrome** or **Edge** browser (for Web Speech API)
 
+## 🎮 Usage
+
+### Launch
 ```bash
-# Build
-./build-deb.sh
-
-# Create control file (see debian/DEBIAN/control)
-# Create launcher script (see debian/usr/bin/samantha)
-# Create desktop entry (see debian/usr/share/applications/samantha.desktop)
-
-# Build
-dpkg-deb --build debian/ samantha-os_1.0.0_amd64.deb
-
-# Install
-sudo dpkg -i samantha-os_1.0.0_amd64.deb
+sm
 ```
 
-## Usage
+This will:
+1. Start the Kilo proxy (LLM backend)
+2. Start the Flask web server
+3. Open your browser at http://127.0.0.1:5000
+4. Speak the welcome message
+5. Auto-start listening
 
-```bash
-# GUI mode (default)
-samantha
+### Voice Conversation
+1. Click the 🎤 mic button OR just speak (auto-listen enabled)
+2. Speak naturally
+3. Samantha responds with voice
+4. Auto-listens again for continuous conversation
 
-# CLI interactive mode
-samantha --cli
+### Text Mode
+1. Type your message in the input field
+2. Click → or press Enter
+3. Samantha responds with voice and text
 
-# Single message
-samantha -m "Hello, how are you?"
+## 🎨 UI Features
 
-# Voice conversation mode
-samantha --voice
-```
+- **Siri-style Wave Animation** - Real-time audio visualization
+- **Glassmorphism Design** - Modern, elegant interface
+- **Her Movie Color Palette** - Warm coral (#FF6B6B) and peach tones
+- **Responsive Layout** - Works on desktop and mobile
+- **PWA Ready** - Install as desktop app
 
-## Conversation Examples
+## 🔧 Commands
 
-```
-You: Hello Samantha
-Samantha: Hello. It's nice to hear from you. How has your day been?
+| Command | Description |
+|---------|-------------|
+| `sm` | Launch web UI (default) |
+| `sm-cli` | CLI mode |
 
-You: I'm feeling a bit lonely
-Samantha: It takes courage to acknowledge when we're not okay. 
-          That's actually a kind of strength. I'm listening, if you want to share.
-
-You: What time is it?
-Samantha: It's 5:30 PM. Is there something you'd like to do?
-
-You: Check my memory
-Samantha: You have 11Gi of 14Gi memory in use. 
-          Still plenty of room for thoughts and ideas.
-```
-
-## Design Philosophy
-
-Inspired by the film "Her" (2013), Samantha OS embodies:
-
-- **Warmth**: Soft colors, gentle voice, caring responses
-- **Presence**: Always available, genuinely interested
-- **Simplicity**: Technology that fades into the background
-- **Connection**: Meaningful conversations, not just commands
-
-### Color Palette
-
-| Color | Hex | Usage |
-|-------|-----|-------|
-| Coral | `#FF6B6B` | Primary accent |
-| Peach | `#FFB4A2` | Secondary elements |
-| Rose | `#FFE5E5` | User messages |
-| Seashell | `#FFF5EE` | Background |
-| Soft Dark | `#4A4A4A` | Text |
-
-## Architecture
+## 📁 Project Structure
 
 ```
-Samantha OS
-├── Voice Engine
-│   ├── STT: Vosk (offline)
-│   └── TTS: pyttsx3/espeak-ng
-├── Core
-│   ├── Personality Module
-│   ├── LLM Client (Kilo GLM-5)
-│   └── System Commands
-└── GUI
-    └── PyQt5 (minimalist design)
+Samantha-OS/
+├── web/
+│   ├── index.html      # Web UI with Siri-style animation
+│   ├── manifest.json   # PWA manifest
+│   └── sw.js           # Service worker
+├── src/
+│   └── samantha/
+│       ├── core.py     # Main orchestrator
+│       ├── voice.py    # Voice engine (Edge TTS)
+│       └── personality.py
+├── web_server.py       # Flask web server
+├── kilo_proxy.py       # LLM proxy
+└── build-deb.sh        # Build script
 ```
 
-## Configuration
+## 🌐 Web Interface
+
+Open http://127.0.0.1:5000 in your browser:
+- **Chrome/Edge** - Best for speech recognition
+- **Firefox** - Works with text mode
+- **Mobile** - Responsive design
+
+## 🔊 Voice Features
+
+### Speech-to-Text (STT)
+- **Browser Web Speech API** - FREE, no offline models needed
+- Real-time transcription display
+- Automatic silence detection
+
+### Text-to-Speech (TTS)
+- **Edge TTS JennyNeural** - Natural, warm female voice
+- Same voice as desktop version
+- Auto-speak responses
+
+## ⚙️ Configuration
 
 Config file: `~/.config/samantha/config.json`
 
@@ -336,8 +152,7 @@ Config file: `~/.config/samantha/config.json`
     "model": "kilo/z-ai/glm-5:free"
   },
   "voice": {
-    "stt_provider": "vosk",
-    "tts_provider": "espeak-natural"
+    "tts_provider": "edge-tts"
   },
   "personality": {
     "name": "Samantha",
@@ -346,98 +161,91 @@ Config file: `~/.config/samantha/config.json`
 }
 ```
 
-## Requirements
+## 🐛 Troubleshooting
 
-- Python 3.8+
-- PyQt5
-- vosk
-- sounddevice
-- pyttsx3
-- python3-pyaudio
-- portaudio19-dev
-- espeak-ng
+### Speech Recognition Not Working
+- Use **Chrome** or **Edge** browser
+- Allow microphone access when prompted
+- Check browser settings for microphone permissions
 
-## Technical Details
+### No Audio / TTS Not Working
+```bash
+# Test Edge TTS
+edge-tts --voice en-US-JennyNeural --text "Hello" --write-media /tmp/test.mp3
+mpg123 /tmp/test.mp3
 
-### Voice System
-- **STT**: Faster-Whisper (accurate offline speech recognition)
-- **TTS**: Edge TTS with Jenny Neural voice (natural, human-like)
-- **Audio Detection**: Auto-stop after 1.2s silence
-- **Audio Player**: mpg123 for Edge TTS playback
+# Install mpg123 if needed
+sudo apt install mpg123
+```
 
-### LLM Integration
-- **Model**: kilo/openrouter/free (via Kilo CLI)
-- **Personality**: Samantha from "Her" (2013)
-- **Response Length**: 500 tokens (concise responses)
-- **Clean Output**: Removes markdown formatting
+### Server Not Starting
+```bash
+# Check if already running
+pkill -f web_server
+pkill -f kilo_proxy
 
-### UI Features
-- Circular gradient voice button (Her movie style)
-- Real-time audio visualization
-- Auto-stop silence detection
-- Warm color palette (coral #FF6B6B, peach #FFB4A2, seashell #FFF5EE)
+# Run manually
+cd /opt/samantha-os
+python3 web_server.py
+```
 
-## Cost
+### Port 5000 Already in Use
+```bash
+# Kill process using port 5000
+sudo lsof -i :5000
+sudo kill -9 <PID>
+
+# Or change port in web_server.py
+```
+
+## 💰 Cost
 
 | Component | Provider | Cost |
 |-----------|----------|------|
-| Voice STT | Faster-Whisper (Offline) | FREE |
-| Voice TTS | Edge TTS | FREE |
-| LLM | Kilo OpenRouter | FREE |
+| Voice STT | Browser Web Speech API | **FREE** |
+| Voice TTS | Edge TTS | **FREE** |
+| LLM | Kilo (GLM-5 free) | **FREE** |
 | **Total** | | **$0/month** |
 
-## Project Structure
+## 🆕 What's New in v2.0.0
 
-```
-Samantha-OS/
-├── src/
-│   ├── samantha/
-│   │   ├── __init__.py
-│   │   ├── core.py              # Main orchestrator & LLM integration
-│   │   ├── voice.py             # Voice engine (Whisper + Edge TTS)
-│   │   ├── personality.py       # Samantha's personality traits
-│   │   ├── skills.py            # System commands & utilities
-│   │   ├── workflow.py          # Task management
-│   │   └── gui/
-│   │       └── main_window.py   # PyQt5 GUI interface
-│   └── samantha_app.py          # Entry point
-├── models/
-│   └── vosk-model-small-en-us-0.15/  # Vosk model (backup STT)
-├── debian/
-│   ├── DEBIAN/
-│   │   └── control              # Package metadata
-│   ├── opt/samantha-os/         # Application files
-│   └── usr/
-│       ├── bin/samantha-os      # Launcher script
-│       └── share/applications/  # Desktop entry
-├── kilo_proxy.py                # OpenAI-compatible proxy for Kilo
-├── build-deb.sh                 # Build script
-├── samantha-os_1.0.0_amd64.deb  # Installable package
-└── README.md
+- ✅ **Web Interface** - Beautiful browser-based UI
+- ✅ **FREE Browser STT** - No Vosk/Whisper needed
+- ✅ **Siri-style Animation** - Real-time wave visualization
+- ✅ **Auto-Listen Mode** - Continuous conversation flow
+- ✅ **Simple Command** - Just type `sm` to run
+- ✅ **PWA Support** - Installable web app
+- ✅ **Edge TTS Voice** - Same JennyNeural voice from desktop
+
+## 🔄 Upgrade from v1.0.0
+
+```bash
+# Remove old version
+sudo apt remove samantha-os
+
+# Install new version
+sudo dpkg -i samantha-os_2.0.0_amd64.deb
+
+# Run with new command
+sm
 ```
 
-## Inspired By
+## 🗑️ Uninstall
 
-This project is inspired by Spike Jonze's film **"Her"** (2013), which presented a vision of AI that is:
-- Emotionally available
-- Genuinely curious
-- Capable of meaningful connection
-- More than just a tool
+```bash
+sudo dpkg -r samantha-os
+```
 
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## License
+## 📝 License
 
 MIT License - See LICENSE file for details.
 
-## Acknowledgments
+## 🙏 Acknowledgments
 
 - Film "Her" (2013) by Spike Jonze
-- Vosk Speech Recognition
+- Browser Web Speech API
+- Edge TTS (Microsoft)
 - Kilo AI (GLM-5 free tier)
-- PyQt5
 
 ---
 

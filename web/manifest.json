@@ -1,0 +1,35 @@
+{
+    "name": "Samantha OS",
+    "short_name": "Samantha",
+    "description": "AI Voice Assistant with Free Browser Speech Recognition",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#FFF5EE",
+    "theme_color": "#FF6B6B",
+    "orientation": "portrait-primary",
+    "icons": [
+        {
+            "src": "/icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "/icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any maskable"
+        }
+    ],
+    "categories": ["utilities", "productivity"],
+    "prefer_related_applications": false,
+    "shortcuts": [
+        {
+            "name": "New Conversation",
+            "short_name": "Chat",
+            "description": "Start a new conversation with Samantha",
+            "url": "/",
+            "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+        }
+    ]
+}
