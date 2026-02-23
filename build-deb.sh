@@ -40,6 +40,7 @@ cp web/index.html "$BUILD_DIR/opt/samantha-os/web/"
 cp web/manifest.json "$BUILD_DIR/opt/samantha-os/web/" 2>/dev/null || true
 cp web/sw.js "$BUILD_DIR/opt/samantha-os/web/" 2>/dev/null || true
 cp web/*.svg "$BUILD_DIR/opt/samantha-os/web/" 2>/dev/null || true
+cp web/*.png "$BUILD_DIR/opt/samantha-os/web/" 2>/dev/null || true
 cp web_server.py "$BUILD_DIR/opt/samantha-os/"
 
 # Create __init__.py
@@ -74,7 +75,7 @@ sleep 2
 echo ""
 echo "=========================================="
 echo "  Samantha OS is running!"
-echo "  Web UI: http://127.0.0.1:5000"
+echo "  Web UI: https://localhost:5000"
 echo "=========================================="
 echo ""
 echo "🎤 Click mic button to speak"
@@ -84,7 +85,7 @@ echo "Press Ctrl+C to stop"
 echo ""
 
 # Open browser
-xdg-open http://127.0.0.1:5000 2>/dev/null &
+xdg-open https://localhost:5000 2>/dev/null &
 
 wait $WEB_PID
 LAUNCHER
@@ -150,7 +151,7 @@ gtk-update-icon-cache -f /usr/share/icons/hicolor/ 2>/dev/null || true
 echo ""
 echo "✓ Samantha OS installed!"
 echo "  Run: sm"
-echo "  Web: http://127.0.0.1:5000"
+echo "  Web: https://localhost:5000"
 EOF
 chmod +x "$BUILD_DIR/DEBIAN/postinst"
 
